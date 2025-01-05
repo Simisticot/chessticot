@@ -18,6 +18,10 @@ impl Game {
         Game { board }
     }
 
+    pub fn make_move(&mut self, chess_move: Move) {
+        self.move_piece(chess_move.origin, chess_move.destination);
+    }
+
     pub fn move_piece(&mut self, origin: Coords, dest: Coords) {
         if let Some(origin_piece) = self.take_piece_at(origin) {
             self.put_piece_at(origin_piece, dest);
@@ -31,6 +35,12 @@ impl Game {
     }
 }
 
+pub struct Move {
+    pub origin: Coords,
+    pub destination: Coords,
+}
+
+#[derive(Copy, Clone)]
 pub struct Coords {
     pub x: isize,
     pub y: isize,

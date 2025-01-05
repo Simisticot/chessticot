@@ -1,8 +1,5 @@
-use chessticot::{piece_display_name, Coords, Game, PieceColor};
-use crossterm::{
-    cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-};
+use chessticot::{piece_display_name, Coords, Game, Move, PieceColor};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -15,7 +12,7 @@ use ratatui::{
     },
     DefaultTerminal, Frame,
 };
-use std::{fmt::format, io, isize};
+use std::io;
 
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
@@ -28,6 +25,7 @@ pub struct App {
     exit: bool,
     game: Game,
     cursor: Coords,
+    selected_square: Option<Coords>,
 }
 
 impl App {
@@ -36,6 +34,7 @@ impl App {
             exit: false,
             game: Game::start(),
             cursor: Coords { x: 0, y: 0 },
+            selected_square: None,
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -63,12 +62,35 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Left => self.move_cursor(Coords { x: -1, y: 0 }),
-            KeyCode::Right => self.move_cursor(Coords { x: 1, y: 0 }),
-            KeyCode::Up => self.move_cursor(Coords { x: 0, y: 1 }),
-            KeyCode::Down => self.move_cursor(Coords { x: 0, y: -1 }),
+            KeyCode::Char('h') | KeyCode::Left => self.move_cursor(Coords { x: -1, y: 0 }),
+            KeyCode::Char('l') | KeyCode::Right => self.move_cursor(Coords { x: 1, y: 0 }),
+            KeyCode::Char('k') | KeyCode::Up => self.move_cursor(Coords { x: 0, y: 1 }),
+            KeyCode::Char('j') | KeyCode::Down => self.move_cursor(Coords { x: 0, y: -1 }),
+            KeyCode::Char(' ') => match self.selected_square {
+                None => self.select_square(),
+                Some(_) => self.confirm_move(),
+            },
+            KeyCode::Esc => self.clear_selection(),
             _ => {}
         }
+    }
+
+    fn select_square(&mut self) {
+        self.selected_square = Some(self.cursor.clone());
+    }
+
+    fn clear_selection(&mut self) {
+        self.selected_square = None;
+    }
+
+    fn confirm_move(&mut self) {
+        self.game.make_move(Move {
+            origin: self
+                .selected_square
+                .expect("Should only reach this code if there is a selected square."),
+            destination: self.cursor,
+        });
+        self.clear_selection();
     }
 
     fn move_cursor(&mut self, delta: Coords) {
@@ -130,6 +152,22 @@ impl Widget for &App {
                         }
                     }
                 }
+                // hightlight the selected square
+                if self.selected_square.is_some() {
+                    ctx.layer();
+                    ctx.draw(&Rectangle {
+                        x: (square_side
+                            * self.selected_square.expect("Inside nullchecked block").x as f64)
+                            - offset,
+                        y: (square_side
+                            * self.selected_square.expect("Inside nullchecked block").y as f64)
+                            - offset,
+                        width: square_side,
+                        height: square_side,
+                        color: Color::Blue,
+                    });
+                }
+
                 // highlight the cursor
                 ctx.layer();
                 ctx.draw(&Rectangle {
