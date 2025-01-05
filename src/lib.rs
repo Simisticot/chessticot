@@ -17,6 +17,12 @@ impl Game {
         }
         Game { board }
     }
+    pub fn legal_destinations_from_origin(&self, origin: &Coords) -> Vec<Coords> {
+        match self.piece_at(origin) {
+            None => Vec::new(),
+            Some(_) => all_squares(),
+        }
+    }
 
     pub fn make_move(&mut self, chess_move: Move) {
         self.move_piece(chess_move.origin, chess_move.destination);
@@ -27,12 +33,25 @@ impl Game {
             self.put_piece_at(origin_piece, dest);
         }
     }
+    pub fn piece_at(&self, loc: &Coords) -> Option<Piece> {
+        self.board[loc.y as usize][loc.x as usize].clone()
+    }
     pub fn take_piece_at(&mut self, loc: Coords) -> Option<Piece> {
         self.board[loc.y as usize][loc.x as usize].take()
     }
     pub fn put_piece_at(&mut self, piece: Piece, loc: Coords) {
         self.board[loc.y as usize][loc.x as usize] = Some(piece);
     }
+}
+
+fn all_squares() -> Vec<Coords> {
+    let mut squares = Vec::new();
+    for i in 0..8 {
+        for j in 0..8 {
+            squares.push(Coords { x: j, y: i });
+        }
+    }
+    squares
 }
 
 pub struct Move {
@@ -46,6 +65,7 @@ pub struct Coords {
     pub y: isize,
 }
 
+#[derive(Copy, Clone)]
 pub struct Piece {
     pub kind: PieceKind,
     pub color: PieceColor,
@@ -81,6 +101,7 @@ impl Piece {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum PieceKind {
     Pawn,
     Rook,
@@ -90,6 +111,7 @@ pub enum PieceKind {
     King,
 }
 
+#[derive(Copy, Clone)]
 pub enum PieceColor {
     Black,
     White,

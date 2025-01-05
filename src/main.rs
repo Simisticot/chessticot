@@ -26,6 +26,7 @@ pub struct App {
     game: Game,
     cursor: Coords,
     selected_square: Option<Coords>,
+    highlighted_destinations: Vec<Coords>,
 }
 
 impl App {
@@ -35,6 +36,7 @@ impl App {
             game: Game::start(),
             cursor: Coords { x: 0, y: 0 },
             selected_square: None,
+            highlighted_destinations: Vec::new(),
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -65,7 +67,7 @@ impl App {
             KeyCode::Char('h') | KeyCode::Left => self.move_cursor(Coords { x: -1, y: 0 }),
             KeyCode::Char('l') | KeyCode::Right => self.move_cursor(Coords { x: 1, y: 0 }),
             KeyCode::Char('k') | KeyCode::Up => self.move_cursor(Coords { x: 0, y: 1 }),
-            KeyCode::Char('j') | KeyCode::Down => self.move_cursor(Coords { x: 0, y: -1 }),
+            KeyCode::Down => self.move_cursor(Coords { x: 0, y: -1 }),
             KeyCode::Char(' ') => match self.selected_square {
                 None => self.select_square(),
                 Some(_) => self.confirm_move(),
@@ -77,10 +79,12 @@ impl App {
 
     fn select_square(&mut self) {
         self.selected_square = Some(self.cursor.clone());
+        self.highlighted_destinations = self.game.legal_destinations_from_origin(&self.cursor);
     }
 
     fn clear_selection(&mut self) {
         self.selected_square = None;
+        self.highlighted_destinations = Vec::new();
     }
 
     fn confirm_move(&mut self) {
@@ -108,6 +112,19 @@ impl App {
     }
 }
 
+const SQUARE_SIDE: f64 = 20.0;
+const OFFSET: f64 = 80.0;
+
+fn rectangle_for_square(square: &Coords, color: Color) -> Rectangle {
+    Rectangle {
+        x: (SQUARE_SIDE * square.x as f64) - OFFSET,
+        y: (SQUARE_SIDE * square.y as f64) - OFFSET,
+        width: SQUARE_SIDE,
+        height: SQUARE_SIDE,
+        color,
+    }
+}
+
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" Chess Time ".bold());
@@ -123,22 +140,20 @@ impl Widget for &App {
             .x_bounds([-180.0, 180.0])
             .y_bounds([-90.0, 90.0])
             .paint(|ctx| {
-                let square_side = 20.0;
-                let offset = 80.0;
                 // draw the grid and pieces
                 for i in 0..8 {
                     for j in 0..8 {
-                        ctx.draw(&Rectangle {
-                            x: (square_side * j as f64) - offset,
-                            y: (square_side * i as f64) - offset,
-                            width: square_side,
-                            height: square_side,
-                            color: Color::White,
-                        });
+                        ctx.draw(&rectangle_for_square(
+                            &Coords {
+                                x: j as isize,
+                                y: i as isize,
+                            },
+                            Color::White,
+                        ));
                         match &self.game.board[i][j] {
                             Some(piece) => ctx.print(
-                                (square_side) * j as f64 - offset + square_side / 4.0,
-                                (square_side) * i as f64 - offset + square_side / 2.0,
+                                (SQUARE_SIDE) * j as f64 - OFFSET + SQUARE_SIDE / 4.0,
+                                (SQUARE_SIDE) * i as f64 - OFFSET + SQUARE_SIDE / 2.0,
                                 match piece.color {
                                     PieceColor::Black => {
                                         Line::from(piece_display_name(&piece.kind).yellow())
@@ -152,31 +167,25 @@ impl Widget for &App {
                         }
                     }
                 }
+
+                // highlight possible destinations
+                ctx.layer();
+                for square in &self.highlighted_destinations {
+                    ctx.draw(&rectangle_for_square(square, Color::LightYellow));
+                }
+
                 // hightlight the selected square
                 if self.selected_square.is_some() {
                     ctx.layer();
-                    ctx.draw(&Rectangle {
-                        x: (square_side
-                            * self.selected_square.expect("Inside nullchecked block").x as f64)
-                            - offset,
-                        y: (square_side
-                            * self.selected_square.expect("Inside nullchecked block").y as f64)
-                            - offset,
-                        width: square_side,
-                        height: square_side,
-                        color: Color::Blue,
-                    });
+                    ctx.draw(&rectangle_for_square(
+                        &self.selected_square.expect("Inside nullcheck"),
+                        Color::Blue,
+                    ));
                 }
 
                 // highlight the cursor
                 ctx.layer();
-                ctx.draw(&Rectangle {
-                    x: (square_side * self.cursor.x as f64) - offset,
-                    y: (square_side * self.cursor.y as f64) - offset,
-                    width: square_side,
-                    height: square_side,
-                    color: Color::Red,
-                });
+                ctx.draw(&rectangle_for_square(&self.cursor, Color::Red));
             })
             .render(area, buf);
     }
