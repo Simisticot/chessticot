@@ -88,13 +88,15 @@ impl App {
     }
 
     fn confirm_move(&mut self) {
-        self.game.make_move(Move {
-            origin: self
-                .selected_square
-                .expect("Should only reach this code if there is a selected square."),
-            destination: self.cursor,
-        });
-        self.clear_selection();
+        if self.highlighted_destinations.contains(&self.cursor) {
+            self.game.make_move(Move {
+                origin: self
+                    .selected_square
+                    .expect("Should only reach this code if there is a selected square."),
+                destination: self.cursor,
+            });
+            self.clear_selection();
+        }
     }
 
     fn move_cursor(&mut self, delta: Coords) {

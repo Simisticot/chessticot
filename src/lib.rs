@@ -89,7 +89,7 @@ pub struct Move {
     pub destination: Coords,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct Coords {
     pub x: isize,
     pub y: isize,
