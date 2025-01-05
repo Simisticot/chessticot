@@ -67,7 +67,7 @@ impl App {
             KeyCode::Char('h') | KeyCode::Left => self.move_cursor(Coords { x: -1, y: 0 }),
             KeyCode::Char('l') | KeyCode::Right => self.move_cursor(Coords { x: 1, y: 0 }),
             KeyCode::Char('k') | KeyCode::Up => self.move_cursor(Coords { x: 0, y: 1 }),
-            KeyCode::Down => self.move_cursor(Coords { x: 0, y: -1 }),
+            KeyCode::Char('j') | KeyCode::Down => self.move_cursor(Coords { x: 0, y: -1 }),
             KeyCode::Char(' ') => match self.selected_square {
                 None => self.select_square(),
                 Some(_) => self.confirm_move(),
