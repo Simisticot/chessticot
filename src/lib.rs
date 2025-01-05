@@ -20,7 +20,37 @@ impl Game {
     pub fn legal_destinations_from_origin(&self, origin: &Coords) -> Vec<Coords> {
         match self.piece_at(origin) {
             None => Vec::new(),
-            Some(_) => all_squares(),
+            Some(piece) => match piece.kind {
+                PieceKind::Pawn => match piece.color {
+                    PieceColor::White => {
+                        let mut destinations = vec![Coords {
+                            x: origin.x,
+                            y: origin.y + 1,
+                        }];
+                        if origin.y == 1 || origin.y == 6 {
+                            destinations.push(Coords {
+                                x: origin.x,
+                                y: origin.y + 2,
+                            });
+                        }
+                        destinations
+                    }
+                    PieceColor::Black => {
+                        let mut destinations = vec![Coords {
+                            x: origin.x,
+                            y: origin.y - 1,
+                        }];
+                        if origin.y == 1 || origin.y == 6 {
+                            destinations.push(Coords {
+                                x: origin.x,
+                                y: origin.y - 2,
+                            });
+                        }
+                        destinations
+                    }
+                },
+                _ => all_squares(),
+            },
         }
     }
 
