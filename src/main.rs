@@ -1,4 +1,4 @@
-use chessticot::{piece_display_name, Coords, Game, Move, PieceColor};
+use chessticot::{Coords, Game, Move, PieceColor, PieceKind};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -79,7 +79,12 @@ impl App {
 
     fn select_square(&mut self) {
         self.selected_square = Some(self.cursor.clone());
-        self.highlighted_destinations = self.game.legal_destinations_from_origin(&self.cursor);
+        self.highlighted_destinations = self
+            .game
+            .legal_moves_from_origin(&self.cursor)
+            .iter()
+            .map(|chess_move| chess_move.destination)
+            .collect();
     }
 
     fn clear_selection(&mut self) {
@@ -88,15 +93,13 @@ impl App {
     }
 
     fn confirm_move(&mut self) {
-        if self.highlighted_destinations.contains(&self.cursor) {
-            self.game.make_move(Move {
-                origin: self
-                    .selected_square
-                    .expect("Should only reach this code if there is a selected square."),
-                destination: self.cursor,
-            });
-            self.clear_selection();
-        }
+        self.game.make_move(&Move {
+            origin: self
+                .selected_square
+                .expect("Should only reach this code if there is a selected square."),
+            destination: self.cursor,
+        });
+        self.clear_selection();
     }
 
     fn move_cursor(&mut self, delta: Coords) {
@@ -124,6 +127,17 @@ fn rectangle_for_square(square: &Coords, color: Color) -> Rectangle {
         width: SQUARE_SIDE,
         height: SQUARE_SIDE,
         color,
+    }
+}
+
+pub fn piece_display_name(kind: &PieceKind) -> String {
+    match kind {
+        PieceKind::Pawn => "Pawn".to_string(),
+        PieceKind::Rook => "Rook".to_string(),
+        PieceKind::Knight => "Knight".to_string(),
+        PieceKind::Bishop => "Bishob".to_string(),
+        PieceKind::Queen => "Queen".to_string(),
+        PieceKind::King => "King".to_string(),
     }
 }
 
