@@ -1,5 +1,5 @@
 use core::panic;
-use std::usize;
+use std::{isize, ops, usize};
 
 pub struct Game {
     pub board: Vec<Vec<Option<Piece>>>,
@@ -51,20 +51,17 @@ impl Game {
     }
 
     pub fn pawn_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        let direction = match color {
+        let vertical_orientation = match color {
             PieceColor::White => 1,
             PieceColor::Black => -1,
         };
-
         let mut legal_moves = vec![];
-        let ahead_one = Coords {
-            x: origin.x,
-            y: origin.y + direction,
+        let forward = Direction {
+            dx: 0,
+            dy: vertical_orientation,
         };
-        let ahead_two = Coords {
-            x: origin.x,
-            y: origin.y + (2 * direction),
-        };
+        let ahead_one = *origin + forward;
+        let ahead_two = ahead_one + forward;
 
         if !ahead_one.is_in_bounds() {
             return legal_moves;
@@ -86,11 +83,11 @@ impl Game {
         vec![
             Coords {
                 x: origin.x + 1,
-                y: origin.y + direction,
+                y: origin.y + vertical_orientation,
             },
             Coords {
                 x: origin.x - 1,
-                y: origin.y + direction,
+                y: origin.y + vertical_orientation,
             },
         ]
         .iter()
@@ -160,6 +157,22 @@ impl Coords {
     fn is_in_bounds(&self) -> bool {
         self.x < 8 && self.x >= 0 && self.y < 8 && self.y >= 0
     }
+}
+
+impl ops::Add<Direction> for Coords {
+    type Output = Coords;
+    fn add(self, dir: Direction) -> Coords {
+        Coords {
+            x: self.x + dir.dx,
+            y: self.y + dir.dy,
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct Direction {
+    pub dx: isize,
+    pub dy: isize,
 }
 
 #[derive(Copy, Clone)]
@@ -421,5 +434,28 @@ mod tests {
                 destination: capture_location
             }]
         )
+    }
+
+    #[test]
+    fn rook_middle_board() {
+        let mut game = Game::empty();
+        game.board[4][4] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        let rook_location = Coords { y: 4, x: 4 };
+        let mut legal_moves = vec![];
+        for i in 0..8 {
+            for j in 0..8 {
+                if !(i == 4 && j == 4) {
+                    legal_moves.push(Move {
+                        origin: rook_location,
+                        destination: Coords { y: i, x: j },
+                    });
+                }
+            }
+        }
+
+        assert_eq!(game.legal_moves_from_origin(&rook_location), legal_moves);
     }
 }
