@@ -61,6 +61,10 @@ impl Game {
             x: origin.x,
             y: origin.y + direction,
         };
+        let ahead_two = Coords {
+            x: origin.x,
+            y: origin.y + (2 * direction),
+        };
 
         if !ahead_one.is_in_bounds() {
             return legal_moves;
@@ -71,13 +75,10 @@ impl Game {
                 origin: origin.clone(),
                 destination: ahead_one,
             });
-            if origin.y == 1 || origin.y == 6 {
+            if (origin.y == 1 || origin.y == 6) && self.piece_at(&ahead_two).is_none() {
                 legal_moves.push(Move {
                     origin: origin.clone(),
-                    destination: Coords {
-                        x: origin.x,
-                        y: origin.y + (2 * direction),
-                    },
+                    destination: ahead_two,
                 });
             }
         }
@@ -374,6 +375,26 @@ mod tests {
         });
         let pawn_location = Coords { y: 1, x: 4 };
         assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
+    }
+    #[test]
+    fn pawn_homerow_second_square_blocked() {
+        let mut game = Game::empty();
+        game.board[1][4] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        game.board[3][4] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::Black,
+        });
+        let pawn_location = Coords { y: 1, x: 4 };
+        assert_eq!(
+            game.legal_moves_from_origin(&pawn_location),
+            vec![Move {
+                origin: pawn_location,
+                destination: Coords { y: 2, x: 4 }
+            }]
+        )
     }
 
     #[test]
