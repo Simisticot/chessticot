@@ -61,6 +61,11 @@ impl Game {
             x: origin.x,
             y: origin.y + direction,
         };
+
+        if !ahead_one.is_in_bounds() {
+            return legal_moves;
+        }
+
         if self.piece_at(&ahead_one).is_none() {
             legal_moves.push(Move {
                 origin: origin.clone(),
@@ -88,14 +93,18 @@ impl Game {
             },
         ]
         .iter()
-        .for_each(|diagonal| match self.piece_at(&diagonal) {
-            None => {}
-            Some(piece) => {
-                if piece.color == color.opposite() {
-                    legal_moves.push(Move {
-                        origin: origin.clone(),
-                        destination: *diagonal,
-                    });
+        .for_each(|diagonal| {
+            if diagonal.is_in_bounds() {
+                match self.piece_at(&diagonal) {
+                    None => {}
+                    Some(piece) => {
+                        if piece.color == color.opposite() {
+                            legal_moves.push(Move {
+                                origin: origin.clone(),
+                                destination: *diagonal,
+                            });
+                        }
+                    }
                 }
             }
         });
@@ -144,6 +153,12 @@ pub struct Move {
 pub struct Coords {
     pub x: isize,
     pub y: isize,
+}
+
+impl Coords {
+    fn is_in_bounds(&self) -> bool {
+        self.x < 8 && self.x >= 0 && self.y < 8 && self.y >= 0
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -291,6 +306,32 @@ mod tests {
             color: PieceColor::Black,
         });
         let pawn_location = Coords { y: 2, x: 4 };
+        assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
+    }
+
+    #[test]
+    fn pawn_edge_of_board_horizontal_blocked() {
+        let mut game = Game::empty();
+        game.board[2][7] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        game.board[3][7] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        let pawn_location = Coords { y: 2, x: 7 };
+        assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
+    }
+
+    #[test]
+    fn pawn_edge_of_board_vertical() {
+        let mut game = Game::empty();
+        game.board[7][4] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        let pawn_location = Coords { y: 7, x: 4 };
         assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
     }
 
