@@ -56,22 +56,49 @@ impl Game {
             PieceColor::Black => -1,
         };
 
-        let mut legal_moves = vec![Move {
-            origin: origin.clone(),
-            destination: Coords {
-                x: origin.x,
-                y: origin.y + direction,
-            },
-        }];
-        if origin.y == 1 || origin.y == 6 {
+        let mut legal_moves = vec![];
+        let ahead_one = Coords {
+            x: origin.x,
+            y: origin.y + direction,
+        };
+        if self.piece_at(&ahead_one).is_none() {
             legal_moves.push(Move {
                 origin: origin.clone(),
-                destination: Coords {
-                    x: origin.x,
-                    y: origin.y + (2 * direction),
-                },
+                destination: ahead_one,
             });
+            if origin.y == 1 || origin.y == 6 {
+                legal_moves.push(Move {
+                    origin: origin.clone(),
+                    destination: Coords {
+                        x: origin.x,
+                        y: origin.y + (2 * direction),
+                    },
+                });
+            }
         }
+
+        vec![
+            Coords {
+                x: origin.x + 1,
+                y: origin.y + direction,
+            },
+            Coords {
+                x: origin.x - 1,
+                y: origin.y + direction,
+            },
+        ]
+        .iter()
+        .for_each(|diagonal| match self.piece_at(&diagonal) {
+            None => {}
+            Some(piece) => {
+                if piece.color == color.opposite() {
+                    legal_moves.push(Move {
+                        origin: origin.clone(),
+                        destination: *diagonal,
+                    });
+                }
+            }
+        });
         legal_moves
     }
 
@@ -165,10 +192,19 @@ pub enum PieceKind {
     King,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum PieceColor {
     Black,
     White,
+}
+
+impl PieceColor {
+    pub fn opposite(&self) -> PieceColor {
+        match self {
+            PieceColor::White => PieceColor::Black,
+            PieceColor::Black => PieceColor::White,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -297,5 +333,31 @@ mod tests {
         });
         let pawn_location = Coords { y: 1, x: 4 };
         assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
+    }
+
+    #[test]
+    fn pawn_homerow_with_capture_blocked() {
+        let mut game = Game::empty();
+        game.board[1][4] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        game.board[2][4] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::Black,
+        });
+        game.board[2][5] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::Black,
+        });
+        let pawn_location = Coords { y: 1, x: 4 };
+        let capture_location = Coords { y: 2, x: 5 };
+        assert_eq!(
+            game.legal_moves_from_origin(&pawn_location),
+            vec![Move {
+                origin: pawn_location,
+                destination: capture_location
+            }]
+        )
     }
 }
