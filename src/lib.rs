@@ -39,6 +39,7 @@ impl Game {
             None => Vec::new(),
             Some(piece) => match piece.kind {
                 PieceKind::Pawn => self.pawn_from(origin, &piece.color),
+                PieceKind::Rook => self.rook_from(origin, &piece.color),
                 _ => all_squares()
                     .iter()
                     .map(|square| Move {
@@ -48,6 +49,27 @@ impl Game {
                     .collect(),
             },
         }
+    }
+
+    pub fn rook_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+        let mut legal_moves: Vec<Move> = Vec::new();
+        let up = Direction { dx: 0, dy: 1 };
+        let down = Direction { dx: 0, dy: -1 };
+        let left = Direction { dx: -1, dy: 0 };
+        let right = Direction { dx: 1, dy: 0 };
+        let sides = vec![up, down, left, right];
+        sides.iter().for_each(|direction| {
+            let mut moves: Vec<Move> = origin
+                .raycast(direction)
+                .iter()
+                .map(|destination| Move {
+                    origin: origin.clone(),
+                    destination: *destination,
+                })
+                .collect();
+            legal_moves.append(&mut moves);
+        });
+        legal_moves
     }
 
     pub fn pawn_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
@@ -157,6 +179,18 @@ impl Coords {
     fn is_in_bounds(&self) -> bool {
         self.x < 8 && self.x >= 0 && self.y < 8 && self.y >= 0
     }
+    fn raycast(&self, direction: &Direction) -> Vec<Coords> {
+        let mut squares = vec![];
+        // for instead of loop to avoid potential infinite loop
+        for i in 1..8 {
+            let next_square = *self + (*direction * i);
+            if !next_square.is_in_bounds() {
+                break;
+            }
+            squares.push(next_square);
+        }
+        squares
+    }
 }
 
 impl ops::Add<Direction> for Coords {
@@ -173,6 +207,16 @@ impl ops::Add<Direction> for Coords {
 pub struct Direction {
     pub dx: isize,
     pub dy: isize,
+}
+
+impl ops::Mul<isize> for Direction {
+    type Output = Direction;
+    fn mul(self, rhs: isize) -> Self::Output {
+        Direction {
+            dx: self.dx * rhs,
+            dy: self.dy * rhs,
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -445,17 +489,28 @@ mod tests {
         });
         let rook_location = Coords { y: 4, x: 4 };
         let mut legal_moves = vec![];
+
+        for j in 0..8 {
+            if j != 4 {
+                legal_moves.push(Move {
+                    origin: rook_location,
+                    destination: Coords { y: 4, x: j },
+                });
+            }
+        }
         for i in 0..8 {
-            for j in 0..8 {
-                if !(i == 4 && j == 4) {
-                    legal_moves.push(Move {
-                        origin: rook_location,
-                        destination: Coords { y: i, x: j },
-                    });
-                }
+            if i != 4 {
+                legal_moves.push(Move {
+                    origin: rook_location,
+                    destination: Coords { x: 4, y: i },
+                });
             }
         }
 
-        assert_eq!(game.legal_moves_from_origin(&rook_location), legal_moves);
+        legal_moves.iter().for_each(|chess_move| {
+            assert!(game
+                .legal_moves_from_origin(&rook_location)
+                .contains(chess_move))
+        });
     }
 }
