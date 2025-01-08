@@ -44,6 +44,7 @@ impl Game {
             Some(piece) => match piece.kind {
                 PieceKind::Pawn => self.pawn_from(origin, &piece.color),
                 PieceKind::Rook => self.rook_from(origin, &piece.color),
+                PieceKind::Knight => self.knight_from(origin, &piece.color),
                 _ => all_squares()
                     .iter()
                     .map(|square| Move {
@@ -55,7 +56,33 @@ impl Game {
         }
     }
 
-    pub fn rook_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+    fn knight_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+        let directions: Vec<Direction> = vec![
+            Direction { dy: 2, dx: 1 },
+            Direction { dy: 2, dx: -1 },
+            Direction { dy: 1, dx: 2 },
+            Direction { dy: 1, dx: -2 },
+            Direction { dy: -2, dx: 1 },
+            Direction { dy: -2, dx: -1 },
+            Direction { dy: -1, dx: -2 },
+            Direction { dy: -1, dx: 2 },
+        ];
+        let potential_moves = directions.iter().map(|direction| Move {
+            origin: origin.clone(),
+            destination: *origin + *direction,
+        });
+        potential_moves
+            .into_iter()
+            .filter(|chess_move| {
+                chess_move.destination.is_in_bounds()
+                    && self
+                        .piece_at(&chess_move.destination)
+                        .is_none_or(|piece| &piece.color != color)
+            })
+            .collect()
+    }
+
+    fn rook_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
         let mut legal_moves: Vec<Move> = Vec::new();
         let up = Direction { dx: 0, dy: 1 };
         let down = Direction { dx: 0, dy: -1 };
@@ -76,7 +103,7 @@ impl Game {
         legal_moves
     }
 
-    pub fn pawn_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+    fn pawn_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
         let vertical_orientation = match color {
             PieceColor::White => 1,
             PieceColor::Black => -1,
@@ -192,6 +219,8 @@ fn all_squares() -> Vec<Coords> {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashSet, hash::RandomState};
+
     use super::*;
 
     #[test]
@@ -417,6 +446,10 @@ mod tests {
             }
         }
 
+        assert_eq!(
+            legal_moves.len(),
+            game.legal_moves_from_origin(&rook_location).len()
+        );
         legal_moves.iter().for_each(|chess_move| {
             assert!(game
                 .legal_moves_from_origin(&rook_location)
@@ -503,5 +536,117 @@ mod tests {
         let legal_moves = vec![];
 
         assert_eq!(game.legal_moves_from_origin(&rook_location), legal_moves);
+    }
+
+    #[test]
+    fn knight_middle_board() {
+        let mut game = Game::empty();
+        game.board[3][3] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::White,
+        });
+        let knight_location = Coords { y: 3, x: 3 };
+
+        let legal_moves: HashSet<Move, RandomState> = HashSet::from_iter(
+            vec![
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 5, x: 4 },
+                },
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 4, x: 5 },
+                },
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 5, x: 2 },
+                },
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 4, x: 1 },
+                },
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 1, x: 4 },
+                },
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 2, x: 5 },
+                },
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 1, x: 2 },
+                },
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 2, x: 1 },
+                },
+            ]
+            .iter()
+            .cloned(),
+        );
+
+        assert_eq!(
+            legal_moves,
+            HashSet::from_iter(
+                game.legal_moves_from_origin(&knight_location)
+                    .iter()
+                    .cloned()
+            )
+        );
+    }
+
+    #[test]
+    fn knight_corner() {
+        let mut game = Game::empty();
+        game.board[0][0] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::White,
+        });
+        let knight_location = Coords { y: 0, x: 0 };
+
+        let legal_moves: HashSet<Move, RandomState> = HashSet::from_iter(
+            vec![
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 2, x: 1 },
+                },
+                Move {
+                    origin: knight_location,
+                    destination: Coords { y: 1, x: 2 },
+                },
+            ]
+            .iter()
+            .cloned(),
+        );
+
+        assert_eq!(
+            legal_moves,
+            HashSet::from_iter(
+                game.legal_moves_from_origin(&knight_location)
+                    .iter()
+                    .cloned()
+            )
+        )
+    }
+
+    #[test]
+    fn knight_corner_blocked() {
+        let mut game = Game::empty();
+        game.board[0][0] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::White,
+        });
+        game.board[1][2] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::White,
+        });
+        game.board[2][1] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::White,
+        });
+        let knight_location = Coords { y: 0, x: 0 };
+
+        assert_eq!(game.legal_moves_from_origin(&knight_location).len(), 0)
     }
 }

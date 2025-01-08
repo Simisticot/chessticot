@@ -1,12 +1,12 @@
 use std::ops;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Eq, Hash, Clone)]
 pub struct Move {
     pub origin: Coords,
     pub destination: Coords,
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Eq, Hash)]
 pub struct Coords {
     pub x: isize,
     pub y: isize,
