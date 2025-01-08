@@ -1,5 +1,8 @@
-use core::panic;
-use std::{isize, ops, usize};
+mod coords;
+mod piece;
+pub use crate::coords::{Coords, Direction, Move};
+pub use crate::piece::{Piece, PieceColor, PieceKind};
+use std::usize;
 
 pub struct Game {
     pub board: Vec<Vec<Option<Piece>>>,
@@ -161,123 +164,6 @@ fn all_squares() -> Vec<Coords> {
         }
     }
     squares
-}
-
-#[derive(PartialEq, Debug)]
-pub struct Move {
-    pub origin: Coords,
-    pub destination: Coords,
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Coords {
-    pub x: isize,
-    pub y: isize,
-}
-
-impl Coords {
-    fn is_in_bounds(&self) -> bool {
-        self.x < 8 && self.x >= 0 && self.y < 8 && self.y >= 0
-    }
-    fn raycast(&self, direction: &Direction) -> Vec<Coords> {
-        let mut squares = vec![];
-        // for instead of loop to avoid potential infinite loop
-        for i in 1..8 {
-            let next_square = *self + (*direction * i);
-            if !next_square.is_in_bounds() {
-                break;
-            }
-            squares.push(next_square);
-        }
-        squares
-    }
-}
-
-impl ops::Add<Direction> for Coords {
-    type Output = Coords;
-    fn add(self, dir: Direction) -> Coords {
-        Coords {
-            x: self.x + dir.dx,
-            y: self.y + dir.dy,
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct Direction {
-    pub dx: isize,
-    pub dy: isize,
-}
-
-impl ops::Mul<isize> for Direction {
-    type Output = Direction;
-    fn mul(self, rhs: isize) -> Self::Output {
-        Direction {
-            dx: self.dx * rhs,
-            dy: self.dy * rhs,
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct Piece {
-    pub kind: PieceKind,
-    pub color: PieceColor,
-}
-
-impl Piece {
-    fn from_initial_position(x: isize, y: isize) -> Option<Piece> {
-        let color = match y {
-            0 | 1 => Some(PieceColor::White),
-            6 | 7 => Some(PieceColor::Black),
-            _ => None,
-        };
-        let kind = match y {
-            1 | 6 => Some(PieceKind::Pawn),
-            0 | 7 => match x {
-                0 | 7 => Some(PieceKind::Rook),
-                1 | 6 => Some(PieceKind::Knight),
-                2 | 5 => Some(PieceKind::Bishop),
-                3 => Some(PieceKind::Queen),
-                4 => Some(PieceKind::King),
-                _ => panic!("Row should not be over 8 squares."),
-            },
-            _ => None,
-        };
-        if kind.is_none() || color.is_none() {
-            None
-        } else {
-            Some(Piece {
-                kind: kind.unwrap(),
-                color: color.unwrap(),
-            })
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub enum PieceKind {
-    Pawn,
-    Rook,
-    Knight,
-    Bishop,
-    Queen,
-    King,
-}
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum PieceColor {
-    Black,
-    White,
-}
-
-impl PieceColor {
-    pub fn opposite(&self) -> PieceColor {
-        match self {
-            PieceColor::White => PieceColor::Black,
-            PieceColor::Black => PieceColor::White,
-        }
-    }
 }
 
 #[cfg(test)]
