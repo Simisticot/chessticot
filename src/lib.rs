@@ -1,5 +1,6 @@
 mod coords;
 mod piece;
+
 pub use crate::coords::{Coords, Direction, Move};
 pub use crate::piece::{Piece, PieceColor, PieceKind};
 use std::usize;
@@ -62,8 +63,8 @@ impl Game {
         let right = Direction { dx: 1, dy: 0 };
         let sides = vec![up, down, left, right];
         sides.iter().for_each(|direction| {
-            let mut moves: Vec<Move> = origin
-                .raycast(direction)
+            let mut moves: Vec<Move> = self
+                .raycast(origin, direction, color)
                 .iter()
                 .map(|destination| Move {
                     origin: origin.clone(),
@@ -153,6 +154,29 @@ impl Game {
     }
     pub fn put_piece_at(&mut self, piece: Piece, loc: Coords) {
         self.board[loc.y as usize][loc.x as usize] = Some(piece);
+    }
+    pub fn raycast(
+        &self,
+        origin: &Coords,
+        direction: &Direction,
+        origin_color: &PieceColor,
+    ) -> Vec<Coords> {
+        let mut squares = vec![];
+        // for instead of loop to avoid potential infinite loop
+        for i in 1..8 {
+            let next_square = *origin + (*direction * i);
+            if !next_square.is_in_bounds() {
+                break;
+            }
+            if let Some(piece) = self.piece_at(&next_square) {
+                if piece.color == origin_color.opposite() {
+                    squares.push(next_square);
+                }
+                break;
+            }
+            squares.push(next_square);
+        }
+        squares
     }
 }
 
@@ -398,5 +422,86 @@ mod tests {
                 .legal_moves_from_origin(&rook_location)
                 .contains(chess_move))
         });
+    }
+
+    #[test]
+    fn rook_middle_board_boxed_in_opposite_color() {
+        let mut game = Game::empty();
+        game.board[4][4] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        game.board[5][4] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::Black,
+        });
+        game.board[3][4] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::Black,
+        });
+        game.board[4][5] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::Black,
+        });
+        game.board[4][3] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::Black,
+        });
+        let rook_location = Coords { y: 4, x: 4 };
+        let up = Coords { y: 5, x: 4 };
+        let down = Coords { y: 3, x: 4 };
+        let left = Coords { y: 4, x: 3 };
+        let right = Coords { y: 4, x: 5 };
+
+        let legal_moves = vec![
+            Move {
+                origin: rook_location,
+                destination: up,
+            },
+            Move {
+                origin: rook_location,
+                destination: down,
+            },
+            Move {
+                origin: rook_location,
+                destination: left,
+            },
+            Move {
+                origin: rook_location,
+                destination: right,
+            },
+        ];
+
+        assert_eq!(game.legal_moves_from_origin(&rook_location), legal_moves);
+    }
+
+    #[test]
+    fn rook_middle_board_boxed_in_own_color() {
+        let mut game = Game::empty();
+        game.board[4][4] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        game.board[5][4] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        game.board[3][4] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        game.board[4][5] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        game.board[4][3] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        let rook_location = Coords { y: 4, x: 4 };
+
+        let legal_moves = vec![];
+
+        assert_eq!(game.legal_moves_from_origin(&rook_location), legal_moves);
     }
 }
