@@ -58,19 +58,7 @@ impl Game {
     }
 
     fn bishop_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        let mut legal_moves: Vec<Move> = vec![];
-        inter_cards().iter().for_each(|diag| {
-            let mut moves: Vec<Move> = self
-                .raycast(origin, diag, color)
-                .iter()
-                .map(|destination| Move {
-                    origin: origin.clone(),
-                    destination: *destination,
-                })
-                .collect();
-            legal_moves.append(&mut moves);
-        });
-        legal_moves
+        self.projected_movement(origin, inter_cards(), color)
     }
 
     fn knight_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
@@ -100,19 +88,7 @@ impl Game {
     }
 
     fn rook_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        let mut legal_moves: Vec<Move> = Vec::new();
-        cards().iter().for_each(|direction| {
-            let mut moves: Vec<Move> = self
-                .raycast(origin, direction, color)
-                .iter()
-                .map(|destination| Move {
-                    origin: origin.clone(),
-                    destination: *destination,
-                })
-                .collect();
-            legal_moves.append(&mut moves);
-        });
-        legal_moves
+        self.projected_movement(origin, cards(), color)
     }
 
     fn pawn_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
@@ -193,6 +169,23 @@ impl Game {
     }
     pub fn put_piece_at(&mut self, piece: Piece, loc: Coords) {
         self.board[loc.y as usize][loc.x as usize] = Some(piece);
+    }
+
+    fn projected_movement(
+        &self,
+        origin: &Coords,
+        directions: Vec<Direction>,
+        origin_color: &PieceColor,
+    ) -> Vec<Move> {
+        directions
+            .iter()
+            .map(|dir| self.raycast(origin, dir, origin_color))
+            .flatten()
+            .map(|destination| Move {
+                origin: origin.clone(),
+                destination,
+            })
+            .collect()
     }
     pub fn raycast(
         &self,
