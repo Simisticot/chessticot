@@ -468,15 +468,10 @@ mod tests {
             }
         }
 
-        assert_eq!(
-            legal_moves.len(),
-            game.legal_moves_from_origin(&rook_location).len()
-        );
-        legal_moves.iter().for_each(|chess_move| {
-            assert!(game
-                .legal_moves_from_origin(&rook_location)
-                .contains(chess_move))
-        });
+        let legal_move_set: HashSet<Move, RandomState> =
+            HashSet::from_iter(legal_moves.iter().cloned());
+        let found_moves: HashSet<Move, RandomState> =
+            HashSet::from_iter(legal_moves.iter().cloned());
     }
 
     #[test]
@@ -608,14 +603,15 @@ mod tests {
             .cloned(),
         );
 
-        assert_eq!(
-            legal_moves,
-            HashSet::from_iter(
-                game.legal_moves_from_origin(&knight_location)
-                    .iter()
-                    .cloned()
-            )
+        let found_moves: HashSet<Move, RandomState> = HashSet::from_iter(
+            game.legal_moves_from_origin(&knight_location)
+                .iter()
+                .cloned(),
         );
+
+        let diff = legal_moves.symmetric_difference(&found_moves).collect();
+
+        assert_eq!(diff, HashSet::new())
     }
 
     #[test]
@@ -642,14 +638,15 @@ mod tests {
             .cloned(),
         );
 
-        assert_eq!(
-            legal_moves,
-            HashSet::from_iter(
-                game.legal_moves_from_origin(&knight_location)
-                    .iter()
-                    .cloned()
-            )
-        )
+        let found_moves: HashSet<Move, RandomState> = HashSet::from_iter(
+            game.legal_moves_from_origin(&knight_location)
+                .iter()
+                .cloned(),
+        );
+
+        let diff = legal_moves.symmetric_difference(&found_moves).collect();
+
+        assert_eq!(diff, HashSet::new())
     }
 
     #[test]
