@@ -7,7 +7,7 @@ use std::usize;
 
 pub struct Game {
     pub board: Vec<Vec<Option<Piece>>>,
-    to_move: PieceColor,
+    pub to_move: PieceColor,
 }
 
 impl Game {
@@ -40,201 +40,272 @@ impl Game {
             to_move: PieceColor::White,
         }
     }
-
-    pub fn is_move_legal(&self, chess_move: &Move) -> bool {
-        self.legal_moves_from_origin(&chess_move.origin)
-            .contains(chess_move)
-    }
-    pub fn legal_moves_from_origin(&self, origin: &Coords) -> Vec<Move> {
-        match self.piece_at(origin) {
-            None => Vec::new(),
-            Some(piece) => {
-                if piece.color == self.to_move {
-                    self.movement_from_origin(origin, piece)
-                } else {
-                    Vec::new()
-                }
-            }
-        }
-    }
-
-    fn movement_from_origin(&self, origin: &Coords, piece: Piece) -> Vec<Move> {
-        match piece.kind {
-            PieceKind::Pawn => self.pawn_from(origin, &piece.color),
-            PieceKind::Rook => self.rook_from(origin, &piece.color),
-            PieceKind::Knight => self.knight_from(origin, &piece.color),
-            PieceKind::Bishop => self.bishop_from(origin, &piece.color),
-            PieceKind::Queen => self.queen_movement(origin, &piece.color),
-            PieceKind::King => self.king_movement(origin, &piece.color),
-        }
-    }
-
-    fn king_movement(&self, origin: &Coords, origin_color: &PieceColor) -> Vec<Move> {
-        self.projected_movement(origin, eight_degrees(), origin_color, Some(1))
-    }
-
-    fn queen_movement(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        self.projected_movement(origin, eight_degrees(), color, None)
-    }
-
-    fn bishop_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        self.projected_movement(origin, inter_cards(), color, None)
-    }
-
-    fn knight_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        let directions: Vec<Direction> = vec![
-            Direction { dy: 2, dx: 1 },
-            Direction { dy: 2, dx: -1 },
-            Direction { dy: 1, dx: 2 },
-            Direction { dy: 1, dx: -2 },
-            Direction { dy: -2, dx: 1 },
-            Direction { dy: -2, dx: -1 },
-            Direction { dy: -1, dx: -2 },
-            Direction { dy: -1, dx: 2 },
-        ];
-        let potential_moves = directions.iter().map(|direction| Move {
-            origin: origin.clone(),
-            destination: *origin + *direction,
-        });
-        potential_moves
-            .into_iter()
-            .filter(|chess_move| {
-                chess_move.destination.is_in_bounds()
-                    && self
-                        .piece_at(&chess_move.destination)
-                        .is_none_or(|piece| &piece.color != color)
-            })
-            .collect()
-    }
-
-    fn rook_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        self.projected_movement(origin, cards(), color, None)
-    }
-
-    fn pawn_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        let vertical_orientation = match color {
-            PieceColor::White => 1,
-            PieceColor::Black => -1,
-        };
-        let mut legal_moves = vec![];
-        let forward = Direction {
-            dx: 0,
-            dy: vertical_orientation,
-        };
-        let ahead_one = *origin + forward;
-        let ahead_two = ahead_one + forward;
-
-        if !ahead_one.is_in_bounds() {
-            return legal_moves;
-        }
-
-        if self.piece_at(&ahead_one).is_none() {
-            legal_moves.push(Move {
-                origin: origin.clone(),
-                destination: ahead_one,
-            });
-            if (origin.y == 1 || origin.y == 6) && self.piece_at(&ahead_two).is_none() {
-                legal_moves.push(Move {
-                    origin: origin.clone(),
-                    destination: ahead_two,
-                });
-            }
-        }
-
-        vec![
-            Coords {
-                x: origin.x + 1,
-                y: origin.y + vertical_orientation,
-            },
-            Coords {
-                x: origin.x - 1,
-                y: origin.y + vertical_orientation,
-            },
-        ]
-        .iter()
-        .for_each(|diagonal| {
-            if diagonal.is_in_bounds() {
-                match self.piece_at(&diagonal) {
-                    None => {}
-                    Some(piece) => {
-                        if piece.color == color.opposite() {
-                            legal_moves.push(Move {
-                                origin: origin.clone(),
-                                destination: *diagonal,
-                            });
-                        }
-                    }
-                }
-            }
-        });
-        legal_moves
-    }
-
     pub fn make_move(&mut self, chess_move: &Move) {
-        if self.is_move_legal(chess_move) {
-            self.move_piece(chess_move.origin, chess_move.destination);
+        if is_move_legal(&self.board, chess_move, &self.to_move) {
+            move_piece(&mut self.board, chess_move.origin, chess_move.destination);
             self.to_move = self.to_move.opposite();
         }
     }
+}
+fn is_move_legal(board: &Vec<Vec<Option<Piece>>>, chess_move: &Move, to_move: &PieceColor) -> bool {
+    legal_moves_from_origin(board, &chess_move.origin, to_move).contains(chess_move)
+        && !opens_own_king(board, chess_move, to_move)
+}
 
-    pub fn move_piece(&mut self, origin: Coords, dest: Coords) {
-        if let Some(origin_piece) = self.take_piece_at(origin) {
-            self.put_piece_at(origin_piece, dest);
-        }
-    }
-    pub fn piece_at(&self, loc: &Coords) -> Option<Piece> {
-        self.board[loc.y as usize][loc.x as usize].clone()
-    }
-    pub fn take_piece_at(&mut self, loc: Coords) -> Option<Piece> {
-        self.board[loc.y as usize][loc.x as usize].take()
-    }
-    pub fn put_piece_at(&mut self, piece: Piece, loc: Coords) {
-        self.board[loc.y as usize][loc.x as usize] = Some(piece);
-    }
+fn opens_own_king(board: &Vec<Vec<Option<Piece>>>, chess_move: &Move, color: &PieceColor) -> bool {
+    let mut potential_board = board.clone();
+    move_piece(
+        &mut potential_board,
+        chess_move.origin,
+        chess_move.destination,
+    );
+    is_in_check(color, &potential_board)
+}
 
-    fn projected_movement(
-        &self,
-        origin: &Coords,
-        directions: Vec<Direction>,
-        origin_color: &PieceColor,
-        limit: Option<isize>,
-    ) -> Vec<Move> {
-        directions
-            .iter()
-            .map(|dir| self.raycast(origin, dir, origin_color, limit))
-            .flatten()
-            .map(|destination| Move {
-                origin: origin.clone(),
-                destination,
-            })
-            .collect()
-    }
-    pub fn raycast(
-        &self,
-        origin: &Coords,
-        direction: &Direction,
-        origin_color: &PieceColor,
-        limit: Option<isize>,
-    ) -> Vec<Coords> {
-        let limit = limit.unwrap_or(7) + 1;
-        let mut squares = vec![];
-        // for instead of loop to avoid potential infinite loop
-        for i in 1..limit {
-            let next_square = *origin + (*direction * i);
-            if !next_square.is_in_bounds() {
-                break;
+pub fn legal_moves_from_origin(
+    board: &Vec<Vec<Option<Piece>>>,
+    origin: &Coords,
+    to_move: &PieceColor,
+) -> Vec<Move> {
+    match piece_at(board, origin) {
+        None => Vec::new(),
+        Some(piece) => {
+            if piece.color == *to_move {
+                movement_from_origin(board, origin, piece)
+            } else {
+                Vec::new()
             }
-            if let Some(piece) = self.piece_at(&next_square) {
-                if piece.color == origin_color.opposite() {
-                    squares.push(next_square);
-                }
-                break;
-            }
-            squares.push(next_square);
         }
-        squares
     }
 }
+
+fn movement_from_origin(
+    board: &Vec<Vec<Option<Piece>>>,
+    origin: &Coords,
+    piece: Piece,
+) -> Vec<Move> {
+    match piece.kind {
+        PieceKind::Pawn => pawn_from(board, origin, &piece.color),
+        PieceKind::Rook => rook_from(board, origin, &piece.color),
+        PieceKind::Knight => knight_from(board, origin, &piece.color),
+        PieceKind::Bishop => bishop_from(board, origin, &piece.color),
+        PieceKind::Queen => queen_movement(board, origin, &piece.color),
+        PieceKind::King => king_movement(board, origin, &piece.color),
+    }
+}
+
+fn king_movement(
+    board: &Vec<Vec<Option<Piece>>>,
+    origin: &Coords,
+    origin_color: &PieceColor,
+) -> Vec<Move> {
+    projected_movement(board, origin, eight_degrees(), origin_color, Some(1))
+}
+
+fn queen_movement(
+    board: &Vec<Vec<Option<Piece>>>,
+    origin: &Coords,
+    color: &PieceColor,
+) -> Vec<Move> {
+    projected_movement(board, origin, eight_degrees(), color, None)
+}
+
+fn bishop_from(board: &Vec<Vec<Option<Piece>>>, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+    projected_movement(board, origin, inter_cards(), color, None)
+}
+
+fn knight_from(board: &Vec<Vec<Option<Piece>>>, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+    let directions: Vec<Direction> = vec![
+        Direction { dy: 2, dx: 1 },
+        Direction { dy: 2, dx: -1 },
+        Direction { dy: 1, dx: 2 },
+        Direction { dy: 1, dx: -2 },
+        Direction { dy: -2, dx: 1 },
+        Direction { dy: -2, dx: -1 },
+        Direction { dy: -1, dx: -2 },
+        Direction { dy: -1, dx: 2 },
+    ];
+    let potential_moves = directions.iter().map(|direction| Move {
+        origin: origin.clone(),
+        destination: *origin + *direction,
+    });
+    potential_moves
+        .into_iter()
+        .filter(|chess_move| {
+            chess_move.destination.is_in_bounds()
+                && piece_at(board, &chess_move.destination)
+                    .is_none_or(|piece| &piece.color != color)
+        })
+        .collect()
+}
+
+fn rook_from(board: &Vec<Vec<Option<Piece>>>, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+    projected_movement(board, origin, cards(), color, None)
+}
+
+fn projected_movement(
+    board: &Vec<Vec<Option<Piece>>>,
+    origin: &Coords,
+    directions: Vec<Direction>,
+    origin_color: &PieceColor,
+    limit: Option<isize>,
+) -> Vec<Move> {
+    directions
+        .iter()
+        .map(|dir| raycast(board, origin, dir, origin_color, limit))
+        .flatten()
+        .map(|destination| Move {
+            origin: origin.clone(),
+            destination,
+        })
+        .collect()
+}
+pub fn raycast(
+    board: &Vec<Vec<Option<Piece>>>,
+    origin: &Coords,
+    direction: &Direction,
+    origin_color: &PieceColor,
+    limit: Option<isize>,
+) -> Vec<Coords> {
+    let limit = limit.unwrap_or(7) + 1;
+    let mut squares = vec![];
+    // for instead of loop to avoid potential infinite loop
+    for i in 1..limit {
+        let next_square = *origin + (*direction * i);
+        if !next_square.is_in_bounds() {
+            break;
+        }
+        if let Some(piece) = piece_at(board, &next_square) {
+            if piece.color == origin_color.opposite() {
+                squares.push(next_square);
+            }
+            break;
+        }
+        squares.push(next_square);
+    }
+    squares
+}
+
+fn pawn_from(board: &Vec<Vec<Option<Piece>>>, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+    let vertical_orientation = match color {
+        PieceColor::White => 1,
+        PieceColor::Black => -1,
+    };
+    let mut legal_moves = vec![];
+    let forward = Direction {
+        dx: 0,
+        dy: vertical_orientation,
+    };
+    let ahead_one = *origin + forward;
+    let ahead_two = ahead_one + forward;
+
+    if !ahead_one.is_in_bounds() {
+        return legal_moves;
+    }
+
+    if piece_at(board, &ahead_one).is_none() {
+        legal_moves.push(Move {
+            origin: origin.clone(),
+            destination: ahead_one,
+        });
+        if (origin.y == 1 || origin.y == 6) && piece_at(board, &ahead_two).is_none() {
+            legal_moves.push(Move {
+                origin: origin.clone(),
+                destination: ahead_two,
+            });
+        }
+    }
+
+    vec![
+        Coords {
+            x: origin.x + 1,
+            y: origin.y + vertical_orientation,
+        },
+        Coords {
+            x: origin.x - 1,
+            y: origin.y + vertical_orientation,
+        },
+    ]
+    .iter()
+    .for_each(|diagonal| {
+        if diagonal.is_in_bounds() {
+            match piece_at(board, &diagonal) {
+                None => {}
+                Some(piece) => {
+                    if piece.color == color.opposite() {
+                        legal_moves.push(Move {
+                            origin: origin.clone(),
+                            destination: *diagonal,
+                        });
+                    }
+                }
+            }
+        }
+    });
+    legal_moves
+}
+
+fn is_in_check(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>) -> bool {
+    match king_position(color, &board) {
+        None => false,
+        Some(loc) => is_attacked(color, &board, &loc),
+    }
+}
+
+fn is_attacked(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>, square: &Coords) -> bool {
+    let mut attacked = false;
+    all_squares().iter().for_each(|loc| {
+        if legal_moves_from_origin(board, &loc, &color.opposite())
+            .iter()
+            .map(|chess_move| chess_move.destination)
+            .collect::<Vec<_>>()
+            .contains(square)
+        {
+            attacked = true;
+        }
+    });
+    attacked
+}
+
+fn all_squares() -> Vec<Coords> {
+    let mut squares = Vec::new();
+    for i in 0..8 {
+        for j in 0..8 {
+            squares.push(Coords { y: i, x: j });
+        }
+    }
+    squares
+}
+
+fn king_position(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>) -> Option<Coords> {
+    for i in 0..8 {
+        for j in 0..8 {
+            let loc = Coords { y: i, x: j };
+            if piece_at(&board, &loc)
+                .is_some_and(|piece| piece.kind == PieceKind::King && piece.color == *color)
+            {
+                return Some(loc);
+            }
+        }
+    }
+    None
+}
+
+fn move_piece(board: &mut Vec<Vec<Option<Piece>>>, origin: Coords, dest: Coords) {
+    if let Some(origin_piece) = take_piece_at(board, origin) {
+        put_piece_at(board, origin_piece, dest);
+    }
+}
+pub fn piece_at(board: &Vec<Vec<Option<Piece>>>, loc: &Coords) -> Option<Piece> {
+    board[loc.y as usize][loc.x as usize].clone()
+}
+pub fn take_piece_at(board: &mut Vec<Vec<Option<Piece>>>, loc: Coords) -> Option<Piece> {
+    board[loc.y as usize][loc.x as usize].take()
+}
+pub fn put_piece_at(board: &mut Vec<Vec<Option<Piece>>>, piece: Piece, loc: Coords) {
+    board[loc.y as usize][loc.x as usize] = Some(piece);
+}
+
 fn eight_degrees() -> Vec<Direction> {
     let mut directions: Vec<Direction> = vec![];
     directions.append(&mut cards());
@@ -273,7 +344,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 1, x: 4 };
         assert_eq!(
-            game.legal_moves_from_origin(&pawn_location),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
             vec![
                 Move {
                     origin: pawn_location,
@@ -296,7 +367,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 2, x: 4 };
         assert_eq!(
-            game.legal_moves_from_origin(&pawn_location),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
             vec![Move {
                 origin: pawn_location,
                 destination: Coords { y: 3, x: 4 }
@@ -318,7 +389,7 @@ mod tests {
         let pawn_location = Coords { y: 2, x: 4 };
         let opposing_pawn_location = Coords { y: 3, x: 5 };
         assert_eq!(
-            game.legal_moves_from_origin(&pawn_location),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
             vec![
                 Move {
                     origin: pawn_location,
@@ -344,7 +415,10 @@ mod tests {
             color: PieceColor::Black,
         });
         let pawn_location = Coords { y: 2, x: 4 };
-        assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
+        assert_eq!(
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            vec![]
+        )
     }
 
     #[test]
@@ -359,7 +433,10 @@ mod tests {
             color: PieceColor::White,
         });
         let pawn_location = Coords { y: 2, x: 7 };
-        assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
+        assert_eq!(
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            vec![]
+        )
     }
 
     #[test]
@@ -370,7 +447,10 @@ mod tests {
             color: PieceColor::White,
         });
         let pawn_location = Coords { y: 7, x: 4 };
-        assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
+        assert_eq!(
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            vec![]
+        )
     }
 
     #[test]
@@ -391,7 +471,7 @@ mod tests {
         let pawn_location = Coords { y: 2, x: 4 };
         let opposing_pawn_location = Coords { y: 3, x: 5 };
         assert_eq!(
-            game.legal_moves_from_origin(&pawn_location),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
             vec![Move {
                 origin: pawn_location,
                 destination: opposing_pawn_location
@@ -411,7 +491,10 @@ mod tests {
             color: PieceColor::Black,
         });
         let pawn_location = Coords { y: 1, x: 4 };
-        assert_eq!(game.legal_moves_from_origin(&pawn_location), vec![])
+        assert_eq!(
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            vec![]
+        )
     }
     #[test]
     fn pawn_homerow_second_square_blocked() {
@@ -426,7 +509,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 1, x: 4 };
         assert_eq!(
-            game.legal_moves_from_origin(&pawn_location),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
             vec![Move {
                 origin: pawn_location,
                 destination: Coords { y: 2, x: 4 }
@@ -452,7 +535,7 @@ mod tests {
         let pawn_location = Coords { y: 1, x: 4 };
         let capture_location = Coords { y: 2, x: 5 };
         assert_eq!(
-            game.legal_moves_from_origin(&pawn_location),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
             vec![Move {
                 origin: pawn_location,
                 destination: capture_location
@@ -489,8 +572,11 @@ mod tests {
 
         let legal_move_set: HashSet<Move, RandomState> =
             HashSet::from_iter(legal_moves.iter().cloned());
-        let found_moves: HashSet<Move, RandomState> =
-            HashSet::from_iter(legal_moves.iter().cloned());
+        let found_moves: HashSet<Move, RandomState> = HashSet::from_iter(legal_moves_from_origin(
+            &game.board,
+            &rook_location,
+            &game.to_move,
+        ));
         let diff: HashSet<&Move, RandomState> =
             legal_move_set.symmetric_difference(&found_moves).collect();
 
@@ -545,7 +631,10 @@ mod tests {
             },
         ];
 
-        assert_eq!(game.legal_moves_from_origin(&rook_location), legal_moves);
+        assert_eq!(
+            legal_moves_from_origin(&game.board, &rook_location, &game.to_move),
+            legal_moves
+        );
     }
 
     #[test]
@@ -575,7 +664,10 @@ mod tests {
 
         let legal_moves = vec![];
 
-        assert_eq!(game.legal_moves_from_origin(&rook_location), legal_moves);
+        assert_eq!(
+            legal_moves_from_origin(&game.board, &rook_location, &game.to_move),
+            legal_moves
+        );
     }
 
     #[test]
@@ -627,7 +719,7 @@ mod tests {
         );
 
         let found_moves: HashSet<Move, RandomState> = HashSet::from_iter(
-            game.legal_moves_from_origin(&knight_location)
+            legal_moves_from_origin(&game.board, &knight_location, &game.to_move)
                 .iter()
                 .cloned(),
         );
@@ -663,7 +755,7 @@ mod tests {
         );
 
         let found_moves: HashSet<Move, RandomState> = HashSet::from_iter(
-            game.legal_moves_from_origin(&knight_location)
+            legal_moves_from_origin(&game.board, &knight_location, &game.to_move)
                 .iter()
                 .cloned(),
         );
@@ -691,7 +783,10 @@ mod tests {
         });
         let knight_location = Coords { y: 0, x: 0 };
 
-        assert_eq!(game.legal_moves_from_origin(&knight_location).len(), 0)
+        assert_eq!(
+            legal_moves_from_origin(&game.board, &knight_location, &game.to_move).len(),
+            0
+        )
     }
 
     #[test]
@@ -725,7 +820,7 @@ mod tests {
         let legal_move_set: HashSet<Move, RandomState> =
             HashSet::from_iter(legal_moves.iter().cloned());
         let found_move_set: HashSet<Move, RandomState> = HashSet::from_iter(
-            game.legal_moves_from_origin(&bishop_location)
+            legal_moves_from_origin(&game.board, &bishop_location, &game.to_move)
                 .iter()
                 .cloned(),
         );
@@ -778,8 +873,11 @@ mod tests {
             },
         ]);
 
-        let found_moves: HashSet<Move, RandomState> =
-            HashSet::from_iter(game.legal_moves_from_origin(&king_location).iter().cloned());
+        let found_moves: HashSet<Move, RandomState> = HashSet::from_iter(
+            legal_moves_from_origin(&game.board, &king_location, &game.to_move)
+                .iter()
+                .cloned(),
+        );
 
         let diff: HashSet<&Move, RandomState> =
             legal_moves.symmetric_difference(&found_moves).collect();
@@ -795,6 +893,120 @@ mod tests {
             color: PieceColor::Black,
         });
         let king_location = Coords { y: 3, x: 3 };
-        assert_eq!(game.legal_moves_from_origin(&king_location).len(), 0);
+        assert_eq!(
+            legal_moves_from_origin(&game.board, &king_location, &game.to_move).len(),
+            0
+        );
+    }
+
+    #[test]
+    fn detects_move_into_check() {
+        let mut game = Game::empty();
+
+        game.board[0][0] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        game.board[2][2] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::Black,
+        });
+        let king_location = Coords { y: 0, x: 0 };
+        assert!(opens_own_king(
+            &game.board,
+            &Move {
+                origin: king_location,
+                destination: Coords { y: 0, x: 1 },
+            },
+            &game.to_move
+        ));
+    }
+
+    #[test]
+    fn cannot_move_into_check() {
+        let mut game = Game::empty();
+
+        game.board[0][0] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        game.board[2][2] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::Black,
+        });
+        let king_location = Coords { y: 0, x: 0 };
+        assert!(!is_move_legal(
+            &game.board,
+            &Move {
+                origin: king_location,
+                destination: Coords { y: 0, x: 1 },
+            },
+            &game.to_move
+        ));
+    }
+
+    #[test]
+    fn detects_check() {
+        let mut game = Game::empty();
+
+        game.board[0][1] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        game.board[2][2] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::Black,
+        });
+        let king_location = Coords { y: 0, x: 1 };
+        assert!(is_attacked(&PieceColor::White, &game.board, &king_location));
+    }
+
+    #[test]
+    fn detects_attacked_square() {
+        let mut game = Game::empty();
+
+        game.board[0][1] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        game.board[2][2] = Some(Piece {
+            kind: PieceKind::Knight,
+            color: PieceColor::Black,
+        });
+        assert!(is_in_check(&PieceColor::White, &game.board));
+    }
+
+    #[test]
+    fn finds_king() {
+        let mut game = Game::empty();
+
+        game.board[0][0] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        assert_eq!(
+            king_position(&PieceColor::White, &game.board).unwrap(),
+            Coords { x: 0, y: 0 }
+        )
+    }
+
+    #[test]
+    fn make_move() {
+        let mut game = Game::empty();
+
+        game.board[0][0] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        let king_location = Coords { x: 0, y: 0 };
+        game.make_move(&Move {
+            origin: king_location,
+            destination: Coords { x: 0, y: 1 },
+        });
+        assert!(piece_at(&game.board, &king_location).is_none());
+        assert_eq!(
+            piece_at(&game.board, &Coords { x: 0, y: 1 }).unwrap().kind,
+            PieceKind::King
+        );
     }
 }

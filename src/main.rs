@@ -1,4 +1,4 @@
-use chessticot::{Coords, Game, Move, PieceColor, PieceKind};
+use chessticot::{legal_moves_from_origin, Coords, Game, Move, PieceColor, PieceKind};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -79,12 +79,11 @@ impl App {
 
     fn select_square(&mut self) {
         self.selected_square = Some(self.cursor.clone());
-        self.highlighted_destinations = self
-            .game
-            .legal_moves_from_origin(&self.cursor)
-            .iter()
-            .map(|chess_move| chess_move.destination)
-            .collect();
+        self.highlighted_destinations =
+            legal_moves_from_origin(&self.game.board, &self.cursor, &self.game.to_move)
+                .iter()
+                .map(|chess_move| chess_move.destination)
+                .collect();
     }
 
     fn clear_selection(&mut self) {
