@@ -58,13 +58,8 @@ impl Game {
     }
 
     fn bishop_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        let up_right = Direction { dy: 1, dx: 1 };
-        let down_left = Direction { dy: -1, dx: -1 };
-        let up_left = Direction { dy: 1, dx: -1 };
-        let down_right = Direction { dy: -1, dx: 1 };
-        let diags = vec![up_right, down_left, up_left, down_right];
         let mut legal_moves: Vec<Move> = vec![];
-        diags.iter().for_each(|diag| {
+        inter_cards().iter().for_each(|diag| {
             let mut moves: Vec<Move> = self
                 .raycast(origin, diag, color)
                 .iter()
@@ -106,12 +101,7 @@ impl Game {
 
     fn rook_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
         let mut legal_moves: Vec<Move> = Vec::new();
-        let up = Direction { dx: 0, dy: 1 };
-        let down = Direction { dx: 0, dy: -1 };
-        let left = Direction { dx: -1, dy: 0 };
-        let right = Direction { dx: 1, dy: 0 };
-        let sides = vec![up, down, left, right];
-        sides.iter().for_each(|direction| {
+        cards().iter().for_each(|direction| {
             let mut moves: Vec<Move> = self
                 .raycast(origin, direction, color)
                 .iter()
@@ -227,6 +217,21 @@ impl Game {
         }
         squares
     }
+}
+fn inter_cards() -> Vec<Direction> {
+    let up_right = Direction { dy: 1, dx: 1 };
+    let down_left = Direction { dy: -1, dx: -1 };
+    let up_left = Direction { dy: 1, dx: -1 };
+    let down_right = Direction { dy: -1, dx: 1 };
+    vec![up_right, down_left, up_left, down_right]
+}
+
+fn cards() -> Vec<Direction> {
+    let up = Direction { dx: 0, dy: 1 };
+    let down = Direction { dx: 0, dy: -1 };
+    let left = Direction { dx: -1, dy: 0 };
+    let right = Direction { dx: 1, dy: 0 };
+    vec![up, down, left, right]
 }
 
 fn all_squares() -> Vec<Coords> {
@@ -472,6 +477,10 @@ mod tests {
             HashSet::from_iter(legal_moves.iter().cloned());
         let found_moves: HashSet<Move, RandomState> =
             HashSet::from_iter(legal_moves.iter().cloned());
+        let diff: HashSet<&Move, RandomState> =
+            legal_move_set.symmetric_difference(&found_moves).collect();
+
+        assert_eq!(diff, HashSet::new())
     }
 
     #[test]
@@ -609,7 +618,8 @@ mod tests {
                 .cloned(),
         );
 
-        let diff = legal_moves.symmetric_difference(&found_moves).collect();
+        let diff: HashSet<&Move, RandomState> =
+            legal_moves.symmetric_difference(&found_moves).collect();
 
         assert_eq!(diff, HashSet::new())
     }
@@ -644,7 +654,8 @@ mod tests {
                 .cloned(),
         );
 
-        let diff = legal_moves.symmetric_difference(&found_moves).collect();
+        let diff: HashSet<&Move, RandomState> =
+            legal_moves.symmetric_difference(&found_moves).collect();
 
         assert_eq!(diff, HashSet::new())
     }
