@@ -47,23 +47,21 @@ impl Game {
                 PieceKind::Knight => self.knight_from(origin, &piece.color),
                 PieceKind::Bishop => self.bishop_from(origin, &piece.color),
                 PieceKind::Queen => self.queen_movement(origin, &piece.color),
-                _ => all_squares()
-                    .iter()
-                    .map(|square| Move {
-                        origin: origin.clone(),
-                        destination: *square,
-                    })
-                    .collect(),
+                PieceKind::King => self.king_movement(origin, &piece.color),
             },
         }
     }
 
+    fn king_movement(&self, origin: &Coords, origin_color: &PieceColor) -> Vec<Move> {
+        self.projected_movement(origin, eight_degrees(), origin_color, Some(1))
+    }
+
     fn queen_movement(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        self.projected_movement(origin, eight_degrees(), color)
+        self.projected_movement(origin, eight_degrees(), color, None)
     }
 
     fn bishop_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        self.projected_movement(origin, inter_cards(), color)
+        self.projected_movement(origin, inter_cards(), color, None)
     }
 
     fn knight_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
@@ -93,7 +91,7 @@ impl Game {
     }
 
     fn rook_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
-        self.projected_movement(origin, cards(), color)
+        self.projected_movement(origin, cards(), color, None)
     }
 
     fn pawn_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
@@ -181,10 +179,11 @@ impl Game {
         origin: &Coords,
         directions: Vec<Direction>,
         origin_color: &PieceColor,
+        limit: Option<isize>,
     ) -> Vec<Move> {
         directions
             .iter()
-            .map(|dir| self.raycast(origin, dir, origin_color))
+            .map(|dir| self.raycast(origin, dir, origin_color, limit))
             .flatten()
             .map(|destination| Move {
                 origin: origin.clone(),
@@ -197,10 +196,12 @@ impl Game {
         origin: &Coords,
         direction: &Direction,
         origin_color: &PieceColor,
+        limit: Option<isize>,
     ) -> Vec<Coords> {
+        let limit = limit.unwrap_or(7) + 1;
         let mut squares = vec![];
         // for instead of loop to avoid potential infinite loop
-        for i in 1..8 {
+        for i in 1..limit {
             let next_square = *origin + (*direction * i);
             if !next_square.is_in_bounds() {
                 break;
@@ -237,16 +238,6 @@ fn cards() -> Vec<Direction> {
     let left = Direction { dx: -1, dy: 0 };
     let right = Direction { dx: 1, dy: 0 };
     vec![up, down, left, right]
-}
-
-fn all_squares() -> Vec<Coords> {
-    let mut squares = Vec::new();
-    for i in 0..8 {
-        for j in 0..8 {
-            squares.push(Coords { x: j, y: i });
-        }
-    }
-    squares
 }
 
 #[cfg(test)]
@@ -724,5 +715,57 @@ mod tests {
             .symmetric_difference(&found_move_set)
             .collect();
         assert_eq!(difference_set, HashSet::new());
+    }
+
+    #[test]
+    fn king_middle_board() {
+        let mut game = Game::empty();
+        game.board[3][3] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        let king_location = Coords { y: 3, x: 3 };
+        let legal_moves = HashSet::from([
+            Move {
+                origin: king_location.clone(),
+                destination: Coords { y: 3, x: 4 },
+            },
+            Move {
+                origin: king_location.clone(),
+                destination: Coords { y: 3, x: 2 },
+            },
+            Move {
+                origin: king_location.clone(),
+                destination: Coords { y: 2, x: 3 },
+            },
+            Move {
+                origin: king_location.clone(),
+                destination: Coords { y: 4, x: 3 },
+            },
+            Move {
+                origin: king_location.clone(),
+                destination: Coords { y: 4, x: 4 },
+            },
+            Move {
+                origin: king_location.clone(),
+                destination: Coords { y: 2, x: 2 },
+            },
+            Move {
+                origin: king_location.clone(),
+                destination: Coords { y: 4, x: 2 },
+            },
+            Move {
+                origin: king_location.clone(),
+                destination: Coords { y: 2, x: 4 },
+            },
+        ]);
+
+        let found_moves: HashSet<Move, RandomState> =
+            HashSet::from_iter(game.legal_moves_from_origin(&king_location).iter().cloned());
+
+        let diff: HashSet<&Move, RandomState> =
+            legal_moves.symmetric_difference(&found_moves).collect();
+
+        assert_eq!(diff, HashSet::new())
     }
 }
