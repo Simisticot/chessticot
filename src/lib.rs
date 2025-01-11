@@ -46,6 +46,7 @@ impl Game {
                 PieceKind::Rook => self.rook_from(origin, &piece.color),
                 PieceKind::Knight => self.knight_from(origin, &piece.color),
                 PieceKind::Bishop => self.bishop_from(origin, &piece.color),
+                PieceKind::Queen => self.queen_movement(origin, &piece.color),
                 _ => all_squares()
                     .iter()
                     .map(|square| Move {
@@ -55,6 +56,10 @@ impl Game {
                     .collect(),
             },
         }
+    }
+
+    fn queen_movement(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+        self.projected_movement(origin, eight_degrees(), color)
     }
 
     fn bishop_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
@@ -211,6 +216,13 @@ impl Game {
         squares
     }
 }
+fn eight_degrees() -> Vec<Direction> {
+    let mut directions: Vec<Direction> = vec![];
+    directions.append(&mut cards());
+    directions.append(&mut inter_cards());
+    directions
+}
+
 fn inter_cards() -> Vec<Direction> {
     let up_right = Direction { dy: 1, dx: 1 };
     let down_left = Direction { dy: -1, dx: -1 };
