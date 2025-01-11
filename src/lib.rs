@@ -45,6 +45,7 @@ impl Game {
                 PieceKind::Pawn => self.pawn_from(origin, &piece.color),
                 PieceKind::Rook => self.rook_from(origin, &piece.color),
                 PieceKind::Knight => self.knight_from(origin, &piece.color),
+                PieceKind::Bishop => self.bishop_from(origin, &piece.color),
                 _ => all_squares()
                     .iter()
                     .map(|square| Move {
@@ -54,6 +55,27 @@ impl Game {
                     .collect(),
             },
         }
+    }
+
+    fn bishop_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
+        let up_right = Direction { dy: 1, dx: 1 };
+        let down_left = Direction { dy: -1, dx: -1 };
+        let up_left = Direction { dy: 1, dx: -1 };
+        let down_right = Direction { dy: -1, dx: 1 };
+        let diags = vec![up_right, down_left, up_left, down_right];
+        let mut legal_moves: Vec<Move> = vec![];
+        diags.iter().for_each(|diag| {
+            let mut moves: Vec<Move> = self
+                .raycast(origin, diag, color)
+                .iter()
+                .map(|destination| Move {
+                    origin: origin.clone(),
+                    destination: *destination,
+                })
+                .collect();
+            legal_moves.append(&mut moves);
+        });
+        legal_moves
     }
 
     fn knight_from(&self, origin: &Coords, color: &PieceColor) -> Vec<Move> {
@@ -648,5 +670,46 @@ mod tests {
         let knight_location = Coords { y: 0, x: 0 };
 
         assert_eq!(game.legal_moves_from_origin(&knight_location).len(), 0)
+    }
+
+    #[test]
+    fn bishob_middle_board() {
+        let mut game = Game::empty();
+        game.board[3][3] = Some(Piece {
+            kind: PieceKind::Bishop,
+            color: PieceColor::White,
+        });
+        let bishop_location = Coords { y: 3, x: 3 };
+        let mut legal_moves = vec![];
+
+        for j in 0..8 {
+            if j != 3 {
+                legal_moves.push(Move {
+                    origin: bishop_location,
+                    destination: Coords { y: j, x: j },
+                });
+            }
+        }
+
+        for i in 0..7 {
+            if i != 3 {
+                legal_moves.push(Move {
+                    origin: bishop_location,
+                    destination: Coords { y: 6 - i, x: i },
+                });
+            }
+        }
+
+        let legal_move_set: HashSet<Move, RandomState> =
+            HashSet::from_iter(legal_moves.iter().cloned());
+        let found_move_set: HashSet<Move, RandomState> = HashSet::from_iter(
+            game.legal_moves_from_origin(&bishop_location)
+                .iter()
+                .cloned(),
+        );
+        let difference_set: HashSet<&Move, RandomState> = legal_move_set
+            .symmetric_difference(&found_move_set)
+            .collect();
+        assert_eq!(difference_set, HashSet::new());
     }
 }
