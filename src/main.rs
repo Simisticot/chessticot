@@ -143,11 +143,10 @@ pub fn piece_display_name(kind: &PieceKind) -> String {
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" Chess Time ".bold());
-        let debug_cursor =
-            Line::from(format!("X: {0} Y: {1}", self.cursor.x, self.cursor.y)).blue();
+        let debug_checkmated = Line::from(format!("{:?}", self.game.checkmated)).blue();
         let block = Block::bordered()
             .title(title.centered())
-            .title_bottom(debug_cursor.centered())
+            .title_bottom(debug_checkmated.centered())
             .border_set(border::THICK);
 
         Canvas::default()

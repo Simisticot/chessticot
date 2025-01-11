@@ -44,7 +44,7 @@ pub enum PieceKind {
     King,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum PieceColor {
     Black,
     White,

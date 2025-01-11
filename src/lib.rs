@@ -8,6 +8,7 @@ use std::usize;
 pub struct Game {
     pub board: Vec<Vec<Option<Piece>>>,
     pub to_move: PieceColor,
+    pub checkmated: Option<PieceColor>,
 }
 
 impl Game {
@@ -23,6 +24,7 @@ impl Game {
         Game {
             board,
             to_move: PieceColor::White,
+            checkmated: None,
         }
     }
 
@@ -38,18 +40,42 @@ impl Game {
         Game {
             board,
             to_move: PieceColor::White,
+            checkmated: None,
         }
     }
     pub fn make_move(&mut self, chess_move: &Move) {
         if is_move_legal(&self.board, chess_move, &self.to_move) {
             move_piece(&mut self.board, chess_move.origin, chess_move.destination);
             self.to_move = self.to_move.opposite();
+            if is_checkmate(&self.board, &self.to_move) {
+                self.checkmated = Some(self.to_move.clone());
+            }
         }
     }
 }
+
+fn is_checkmate(board: &Vec<Vec<Option<Piece>>>, to_move: &PieceColor) -> bool {
+    return is_in_check(to_move, board) && all_legal_moves(board, to_move).len() == 0;
+}
+
+fn all_legal_moves(board: &Vec<Vec<Option<Piece>>>, to_move: &PieceColor) -> Vec<Move> {
+    all_squares()
+        .iter()
+        .map(|square| legal_moves_from_origin(board, square, to_move))
+        .flatten()
+        .collect()
+}
+
+fn all_possible_moves(board: &Vec<Vec<Option<Piece>>>, to_move: &PieceColor) -> Vec<Move> {
+    all_squares()
+        .iter()
+        .map(|square| possible_moves_from_origin(board, square, to_move))
+        .flatten()
+        .collect()
+}
+
 fn is_move_legal(board: &Vec<Vec<Option<Piece>>>, chess_move: &Move, to_move: &PieceColor) -> bool {
     legal_moves_from_origin(board, &chess_move.origin, to_move).contains(chess_move)
-        && !opens_own_king(board, chess_move, to_move)
 }
 
 fn opens_own_king(board: &Vec<Vec<Option<Piece>>>, chess_move: &Move, color: &PieceColor) -> bool {
@@ -63,6 +89,18 @@ fn opens_own_king(board: &Vec<Vec<Option<Piece>>>, chess_move: &Move, color: &Pi
 }
 
 pub fn legal_moves_from_origin(
+    board: &Vec<Vec<Option<Piece>>>,
+    origin: &Coords,
+    to_move: &PieceColor,
+) -> Vec<Move> {
+    possible_moves_from_origin(board, origin, to_move)
+        .iter()
+        .cloned()
+        .filter(|chess_move| !opens_own_king(board, chess_move, to_move))
+        .collect()
+}
+
+fn possible_moves_from_origin(
     board: &Vec<Vec<Option<Piece>>>,
     origin: &Coords,
     to_move: &PieceColor,
@@ -208,6 +246,9 @@ fn pawn_from(board: &Vec<Vec<Option<Piece>>>, origin: &Coords, color: &PieceColo
             origin: origin.clone(),
             destination: ahead_one,
         });
+        if !ahead_two.is_in_bounds() {
+            return legal_moves;
+        };
         if (origin.y == 1 || origin.y == 6) && piece_at(board, &ahead_two).is_none() {
             legal_moves.push(Move {
                 origin: origin.clone(),
@@ -253,18 +294,11 @@ fn is_in_check(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>) -> bool {
 }
 
 fn is_attacked(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>, square: &Coords) -> bool {
-    let mut attacked = false;
-    all_squares().iter().for_each(|loc| {
-        if legal_moves_from_origin(board, &loc, &color.opposite())
-            .iter()
-            .map(|chess_move| chess_move.destination)
-            .collect::<Vec<_>>()
-            .contains(square)
-        {
-            attacked = true;
-        }
-    });
-    attacked
+    all_possible_moves(board, &color.opposite())
+        .iter()
+        .map(|chess_move| chess_move.destination)
+        .collect::<Vec<_>>()
+        .contains(square)
 }
 
 fn all_squares() -> Vec<Coords> {
@@ -977,6 +1011,24 @@ mod tests {
     }
 
     #[test]
+    fn detects_checkmate() {
+        let mut game = Game::empty();
+
+        game.board[0][0] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        game.board[1][1] = Some(Piece {
+            kind: PieceKind::Queen,
+            color: PieceColor::Black,
+        });
+        game.board[2][2] = Some(Piece {
+            kind: PieceKind::Queen,
+            color: PieceColor::Black,
+        });
+        assert!(is_checkmate(&game.board, &game.to_move));
+    }
+    #[test]
     fn finds_king() {
         let mut game = Game::empty();
 
@@ -1008,5 +1060,41 @@ mod tests {
             piece_at(&game.board, &Coords { x: 0, y: 1 }).unwrap().kind,
             PieceKind::King
         );
+    }
+
+    #[test]
+    fn scholars_mate() {
+        let mut game = Game::start();
+
+        game.make_move(&Move {
+            origin: Coords { x: 4, y: 1 },
+            destination: Coords { x: 4, y: 3 },
+        });
+        game.make_move(&Move {
+            origin: Coords { x: 4, y: 6 },
+            destination: Coords { x: 4, y: 4 },
+        });
+        game.make_move(&Move {
+            origin: Coords { x: 3, y: 0 },
+            destination: Coords { x: 7, y: 4 },
+        });
+        game.make_move(&Move {
+            origin: Coords { x: 1, y: 7 },
+            destination: Coords { x: 2, y: 5 },
+        });
+        game.make_move(&Move {
+            origin: Coords { x: 5, y: 0 },
+            destination: Coords { x: 2, y: 3 },
+        });
+        game.make_move(&Move {
+            origin: Coords { x: 6, y: 7 },
+            destination: Coords { x: 5, y: 5 },
+        });
+        game.make_move(&Move {
+            origin: Coords { x: 7, y: 4 },
+            destination: Coords { x: 5, y: 6 },
+        });
+
+        assert!(game.checkmated == Some(PieceColor::Black));
     }
 }
