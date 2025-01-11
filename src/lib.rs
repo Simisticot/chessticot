@@ -173,6 +173,7 @@ impl Game {
     pub fn make_move(&mut self, chess_move: &Move) {
         if self.is_move_legal(chess_move) {
             self.move_piece(chess_move.origin, chess_move.destination);
+            self.to_move = self.to_move.opposite();
         }
     }
 
@@ -259,7 +260,7 @@ fn cards() -> Vec<Direction> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, env::set_var, hash::RandomState};
+    use std::{collections::HashSet, hash::RandomState};
 
     use super::*;
 
