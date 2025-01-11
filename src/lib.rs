@@ -7,6 +7,7 @@ use std::usize;
 
 pub struct Game {
     pub board: Vec<Vec<Option<Piece>>>,
+    to_move: PieceColor,
 }
 
 impl Game {
@@ -19,7 +20,10 @@ impl Game {
             }
             board.push(row);
         }
-        Game { board }
+        Game {
+            board,
+            to_move: PieceColor::White,
+        }
     }
 
     pub fn empty() -> Game {
@@ -31,7 +35,10 @@ impl Game {
             }
             board.push(row);
         }
-        Game { board }
+        Game {
+            board,
+            to_move: PieceColor::White,
+        }
     }
 
     pub fn is_move_legal(&self, chess_move: &Move) -> bool {
@@ -41,14 +48,24 @@ impl Game {
     pub fn legal_moves_from_origin(&self, origin: &Coords) -> Vec<Move> {
         match self.piece_at(origin) {
             None => Vec::new(),
-            Some(piece) => match piece.kind {
-                PieceKind::Pawn => self.pawn_from(origin, &piece.color),
-                PieceKind::Rook => self.rook_from(origin, &piece.color),
-                PieceKind::Knight => self.knight_from(origin, &piece.color),
-                PieceKind::Bishop => self.bishop_from(origin, &piece.color),
-                PieceKind::Queen => self.queen_movement(origin, &piece.color),
-                PieceKind::King => self.king_movement(origin, &piece.color),
-            },
+            Some(piece) => {
+                if piece.color == self.to_move {
+                    self.movement_from_origin(origin, piece)
+                } else {
+                    Vec::new()
+                }
+            }
+        }
+    }
+
+    fn movement_from_origin(&self, origin: &Coords, piece: Piece) -> Vec<Move> {
+        match piece.kind {
+            PieceKind::Pawn => self.pawn_from(origin, &piece.color),
+            PieceKind::Rook => self.rook_from(origin, &piece.color),
+            PieceKind::Knight => self.knight_from(origin, &piece.color),
+            PieceKind::Bishop => self.bishop_from(origin, &piece.color),
+            PieceKind::Queen => self.queen_movement(origin, &piece.color),
+            PieceKind::King => self.king_movement(origin, &piece.color),
         }
     }
 
@@ -242,7 +259,7 @@ fn cards() -> Vec<Direction> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, hash::RandomState};
+    use std::{collections::HashSet, env::set_var, hash::RandomState};
 
     use super::*;
 
@@ -767,5 +784,16 @@ mod tests {
             legal_moves.symmetric_difference(&found_moves).collect();
 
         assert_eq!(diff, HashSet::new())
+    }
+
+    #[test]
+    fn cannot_move_out_of_turn() {
+        let mut game = Game::empty();
+        game.board[3][3] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::Black,
+        });
+        let king_location = Coords { y: 3, x: 3 };
+        assert_eq!(game.legal_moves_from_origin(&king_location).len(), 0);
     }
 }
