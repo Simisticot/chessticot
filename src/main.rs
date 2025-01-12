@@ -1,4 +1,4 @@
-use chessticot::{legal_moves_from_origin, Coords, Game, Move, PieceColor, PieceKind};
+use chessticot::{legal_moves_from_origin, ChessMove, Coords, Game, Move, PieceColor, PieceKind};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -82,7 +82,10 @@ impl App {
         self.highlighted_destinations =
             legal_moves_from_origin(&self.game.board, &self.cursor, &self.game.to_move)
                 .iter()
-                .map(|chess_move| chess_move.destination)
+                .filter_map(|chess_move| match chess_move {
+                    ChessMove::RegularMove(coordinates) => Some(coordinates.destination),
+                    _ => None,
+                })
                 .collect();
     }
 
@@ -92,12 +95,13 @@ impl App {
     }
 
     fn confirm_move(&mut self) {
-        self.game.make_move(&Move {
+        self.game.make_move(&ChessMove::RegularMove(Move {
             origin: self
                 .selected_square
                 .expect("Should only reach this code if there is a selected square."),
             destination: self.cursor,
-        });
+        }));
+
         self.clear_selection();
     }
 

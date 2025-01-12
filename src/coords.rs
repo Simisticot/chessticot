@@ -1,5 +1,13 @@
 use std::ops;
 
+#[derive(PartialEq, Hash, Eq, Debug, Clone)]
+pub enum ChessMove {
+    RegularMove(Move),
+    CastleLeft,
+    CastleRight,
+    EnPassant(Move, Coords),
+}
+
 #[derive(PartialEq, Debug, Eq, Hash, Clone)]
 pub struct Move {
     pub origin: Coords,
