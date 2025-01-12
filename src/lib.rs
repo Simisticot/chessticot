@@ -6,10 +6,53 @@ pub use crate::piece::{Piece, PieceColor, PieceKind};
 use core::panic;
 use std::usize;
 
+pub struct History {
+    white_king_moved: bool,
+    white_left_rook_moved: bool,
+    white_right_rook_moved: bool,
+    black_king_moved: bool,
+    black_left_rook_moved: bool,
+    black_right_rook_moved: bool,
+}
+impl History {
+    pub fn new() -> History {
+        History {
+            white_king_moved: false,
+            white_left_rook_moved: false,
+            white_right_rook_moved: false,
+            black_king_moved: false,
+            black_left_rook_moved: false,
+            black_right_rook_moved: false,
+        }
+    }
+
+    pub fn king_moved(&self, color: &PieceColor) -> &bool {
+        match color {
+            PieceColor::White => &self.white_king_moved,
+            PieceColor::Black => &self.black_king_moved,
+        }
+    }
+
+    pub fn right_rook_moved(&self, color: &PieceColor) -> &bool {
+        match color {
+            PieceColor::White => &self.white_right_rook_moved,
+            PieceColor::Black => &self.black_right_rook_moved,
+        }
+    }
+
+    pub fn left_rook_moved(&self, color: &PieceColor) -> &bool {
+        match color {
+            PieceColor::White => &self.white_left_rook_moved,
+            PieceColor::Black => &self.black_left_rook_moved,
+        }
+    }
+}
+
 pub struct Game {
     pub board: Vec<Vec<Option<Piece>>>,
     pub to_move: PieceColor,
     pub checkmated: Option<PieceColor>,
+    pub history: History,
 }
 
 impl Game {
@@ -26,6 +69,7 @@ impl Game {
             board,
             to_move: PieceColor::White,
             checkmated: None,
+            history: History::new(),
         }
     }
 
@@ -42,44 +86,78 @@ impl Game {
             board,
             to_move: PieceColor::White,
             checkmated: None,
+            history: History::new(),
         }
     }
     pub fn make_move(&mut self, chess_move: &ChessMove) {
-        if is_move_legal(&self.board, chess_move, &self.to_move) {
-            execute_move(&mut self.board, chess_move);
+        if is_move_legal(&self.board, chess_move, &self.to_move, &self.history) {
+            execute_move(&mut self.board, chess_move, &self.to_move);
             self.to_move = self.to_move.opposite();
-            if is_checkmate(&self.board, &self.to_move) {
+            if is_checkmate(&self.board, &self.to_move, &self.history) {
                 self.checkmated = Some(self.to_move.clone());
             }
         }
     }
 }
 
-fn execute_move(board: &mut Vec<Vec<Option<Piece>>>, chess_move: &ChessMove) {
+fn execute_move(board: &mut Vec<Vec<Option<Piece>>>, chess_move: &ChessMove, color: &PieceColor) {
     match chess_move {
         ChessMove::RegularMove(coordinates) => {
             move_piece(board, coordinates.origin, coordinates.destination)
+        }
+        ChessMove::CastleLeft => {
+            castle_left(board, color);
+        }
+        ChessMove::CastleRight => {
+            castle_right(board, color);
         }
         _ => panic!("This type of move is not implemented"),
     }
 }
 
-fn is_checkmate(board: &Vec<Vec<Option<Piece>>>, to_move: &PieceColor) -> bool {
-    return is_in_check(to_move, board) && all_legal_moves(board, to_move).len() == 0;
+fn castle_left(board: &mut Vec<Vec<Option<Piece>>>, color: &PieceColor) {
+    let row = match color {
+        PieceColor::White => 0,
+        PieceColor::Black => 7,
+    };
+    move_piece(board, Coords { x: 4, y: row }, Coords { x: 2, y: row });
+    move_piece(board, Coords { x: 4, y: row }, Coords { x: 5, y: row });
 }
 
-fn all_legal_moves(board: &Vec<Vec<Option<Piece>>>, to_move: &PieceColor) -> Vec<ChessMove> {
+fn castle_right(board: &mut Vec<Vec<Option<Piece>>>, color: &PieceColor) {
+    let row = match color {
+        PieceColor::White => 0,
+        PieceColor::Black => 7,
+    };
+    move_piece(board, Coords { x: 4, y: row }, Coords { x: 6, y: row });
+    move_piece(board, Coords { x: 4, y: row }, Coords { x: 3, y: row });
+}
+
+fn is_checkmate(board: &Vec<Vec<Option<Piece>>>, to_move: &PieceColor, history: &History) -> bool {
+    return is_in_check(to_move, board, history)
+        && all_legal_moves(board, to_move, history).len() == 0;
+}
+
+fn all_legal_moves(
+    board: &Vec<Vec<Option<Piece>>>,
+    to_move: &PieceColor,
+    history: &History,
+) -> Vec<ChessMove> {
     all_squares()
         .iter()
-        .map(|square| legal_moves_from_origin(board, square, to_move))
+        .map(|square| legal_moves_from_origin(board, square, to_move, history))
         .flatten()
         .collect()
 }
 
-fn all_possible_moves(board: &Vec<Vec<Option<Piece>>>, to_move: &PieceColor) -> Vec<ChessMove> {
+fn all_possible_moves(
+    board: &Vec<Vec<Option<Piece>>>,
+    to_move: &PieceColor,
+    history: &History,
+) -> Vec<ChessMove> {
     all_squares()
         .iter()
-        .map(|square| possible_moves_from_origin(board, square, to_move))
+        .map(|square| possible_moves_from_origin(board, square, to_move, history))
         .flatten()
         .collect()
 }
@@ -88,34 +166,44 @@ fn is_move_legal(
     board: &Vec<Vec<Option<Piece>>>,
     chess_move: &ChessMove,
     to_move: &PieceColor,
+    history: &History,
 ) -> bool {
-    match chess_move {
-        ChessMove::RegularMove(regular_move) => {
-            legal_moves_from_origin(board, &regular_move.origin, to_move).contains(chess_move)
+    let origin = match chess_move {
+        ChessMove::RegularMove(regular_move) => regular_move.origin,
+        ChessMove::CastleRight | ChessMove::CastleLeft => {
+            let row = match to_move {
+                PieceColor::White => 0,
+                PieceColor::Black => 7,
+            };
+            Coords { y: row, x: 4 }
         }
-        _ => false,
-    }
+        _ => return false,
+    };
+
+    legal_moves_from_origin(board, &origin, to_move, history).contains(chess_move)
 }
 
 fn opens_own_king(
     board: &Vec<Vec<Option<Piece>>>,
     chess_move: &ChessMove,
     color: &PieceColor,
+    history: &History,
 ) -> bool {
     let mut potential_board = board.clone();
-    execute_move(&mut potential_board, chess_move);
-    is_in_check(color, &potential_board)
+    execute_move(&mut potential_board, chess_move, color);
+    is_in_check(color, &potential_board, history)
 }
 
 pub fn legal_moves_from_origin(
     board: &Vec<Vec<Option<Piece>>>,
     origin: &Coords,
     to_move: &PieceColor,
+    history: &History,
 ) -> Vec<ChessMove> {
-    possible_moves_from_origin(board, origin, to_move)
+    possible_moves_from_origin(board, origin, to_move, history)
         .iter()
         .cloned()
-        .filter(|chess_move| !opens_own_king(board, chess_move, to_move))
+        .filter(|chess_move| !opens_own_king(board, chess_move, to_move, history))
         .collect()
 }
 
@@ -123,12 +211,13 @@ fn possible_moves_from_origin(
     board: &Vec<Vec<Option<Piece>>>,
     origin: &Coords,
     to_move: &PieceColor,
+    history: &History,
 ) -> Vec<ChessMove> {
     match piece_at(board, origin) {
         None => Vec::new(),
         Some(piece) => {
             if piece.color == *to_move {
-                movement_from_origin(board, origin, piece)
+                movement_from_origin(board, origin, piece, history)
             } else {
                 Vec::new()
             }
@@ -140,6 +229,7 @@ fn movement_from_origin(
     board: &Vec<Vec<Option<Piece>>>,
     origin: &Coords,
     piece: Piece,
+    history: &History,
 ) -> Vec<ChessMove> {
     match piece.kind {
         PieceKind::Pawn => pawn_from(board, origin, &piece.color),
@@ -147,7 +237,7 @@ fn movement_from_origin(
         PieceKind::Knight => knight_from(board, origin, &piece.color),
         PieceKind::Bishop => bishop_from(board, origin, &piece.color),
         PieceKind::Queen => queen_movement(board, origin, &piece.color),
-        PieceKind::King => king_movement(board, origin, &piece.color),
+        PieceKind::King => king_movement(board, origin, &piece.color, history),
     }
 }
 
@@ -155,8 +245,58 @@ fn king_movement(
     board: &Vec<Vec<Option<Piece>>>,
     origin: &Coords,
     origin_color: &PieceColor,
+    history: &History,
 ) -> Vec<ChessMove> {
-    projected_movement(board, origin, eight_degrees(), origin_color, Some(1))
+    let mut moves = projected_movement(board, origin, eight_degrees(), origin_color, Some(1));
+    let row = match origin_color {
+        PieceColor::White => 0,
+        PieceColor::Black => 7,
+    };
+    if piece_at(board, &Coords { y: row, x: 5 }).is_none()
+        && piece_at(board, &Coords { y: row, x: 6 }).is_none()
+        && piece_at(board, &Coords { y: row, x: 4 }).is_some_and(|piece| {
+            piece
+                == Piece {
+                    kind: PieceKind::King,
+                    color: origin_color.clone(),
+                }
+        })
+        && !history.king_moved(origin_color)
+        && piece_at(board, &Coords { y: row, x: 7 }).is_some_and(|piece| {
+            piece
+                == Piece {
+                    kind: PieceKind::Rook,
+                    color: origin_color.clone(),
+                }
+        })
+        && !history.right_rook_moved(origin_color)
+    {
+        moves.push(ChessMove::CastleRight);
+    }
+    if piece_at(board, &Coords { y: row, x: 3 }).is_none()
+        && piece_at(board, &Coords { y: row, x: 2 }).is_none()
+        && piece_at(board, &Coords { y: row, x: 1 }).is_none()
+        && piece_at(board, &Coords { y: row, x: 4 }).is_some_and(|piece| {
+            piece
+                == Piece {
+                    kind: PieceKind::King,
+                    color: origin_color.clone(),
+                }
+        })
+        && !history.king_moved(origin_color)
+        && piece_at(board, &Coords { y: row, x: 0 }).is_some_and(|piece| {
+            piece
+                == Piece {
+                    kind: PieceKind::Rook,
+                    color: origin_color.clone(),
+                }
+        })
+        && !history.left_rook_moved(origin_color)
+    {
+        moves.push(ChessMove::CastleLeft);
+    }
+
+    moves
 }
 
 fn queen_movement(
@@ -328,15 +468,20 @@ fn pawn_from(
     legal_moves
 }
 
-fn is_in_check(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>) -> bool {
+fn is_in_check(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>, history: &History) -> bool {
     match king_position(color, &board) {
         None => false,
-        Some(loc) => is_attacked(color, &board, &loc),
+        Some(loc) => is_attacked(color, &board, &loc, history),
     }
 }
 
-fn is_attacked(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>, square: &Coords) -> bool {
-    all_possible_moves(board, &color.opposite())
+fn is_attacked(
+    color: &PieceColor,
+    board: &Vec<Vec<Option<Piece>>>,
+    square: &Coords,
+    history: &History,
+) -> bool {
+    all_possible_moves(board, &color.opposite(), history)
         .iter()
         .map(|chess_move| match chess_move {
             ChessMove::RegularMove(coordinates) => &coordinates.destination == square,
@@ -423,7 +568,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 1, x: 4 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![
                 ChessMove::RegularMove(Move {
                     origin: pawn_location,
@@ -446,7 +591,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 2, x: 4 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![ChessMove::RegularMove(Move {
                 origin: pawn_location,
                 destination: Coords { y: 3, x: 4 }
@@ -468,7 +613,7 @@ mod tests {
         let pawn_location = Coords { y: 2, x: 4 };
         let opposing_pawn_location = Coords { y: 3, x: 5 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![
                 ChessMove::RegularMove(Move {
                     origin: pawn_location,
@@ -495,7 +640,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 2, x: 4 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![]
         )
     }
@@ -513,7 +658,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 2, x: 7 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![]
         )
     }
@@ -527,7 +672,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 7, x: 4 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![]
         )
     }
@@ -550,7 +695,7 @@ mod tests {
         let pawn_location = Coords { y: 2, x: 4 };
         let opposing_pawn_location = Coords { y: 3, x: 5 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![ChessMove::RegularMove(Move {
                 origin: pawn_location,
                 destination: opposing_pawn_location
@@ -571,7 +716,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 1, x: 4 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![]
         )
     }
@@ -588,7 +733,7 @@ mod tests {
         });
         let pawn_location = Coords { y: 1, x: 4 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![ChessMove::RegularMove(Move {
                 origin: pawn_location,
                 destination: Coords { y: 2, x: 4 }
@@ -614,7 +759,7 @@ mod tests {
         let pawn_location = Coords { y: 1, x: 4 };
         let capture_location = Coords { y: 2, x: 5 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &pawn_location, &game.to_move, &game.history),
             vec![ChessMove::RegularMove(Move {
                 origin: pawn_location,
                 destination: capture_location
@@ -652,7 +797,7 @@ mod tests {
         let legal_move_set: HashSet<ChessMove, RandomState> =
             HashSet::from_iter(legal_moves.iter().cloned());
         let found_moves: HashSet<ChessMove, RandomState> = HashSet::from_iter(
-            legal_moves_from_origin(&game.board, &rook_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &rook_location, &game.to_move, &game.history),
         );
         let diff: HashSet<&ChessMove, RandomState> =
             legal_move_set.symmetric_difference(&found_moves).collect();
@@ -709,7 +854,7 @@ mod tests {
         ];
 
         assert_eq!(
-            legal_moves_from_origin(&game.board, &rook_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &rook_location, &game.to_move, &game.history),
             legal_moves
         );
     }
@@ -742,7 +887,7 @@ mod tests {
         let legal_moves = vec![];
 
         assert_eq!(
-            legal_moves_from_origin(&game.board, &rook_location, &game.to_move),
+            legal_moves_from_origin(&game.board, &rook_location, &game.to_move, &game.history),
             legal_moves
         );
     }
@@ -796,7 +941,7 @@ mod tests {
         );
 
         let found_moves: HashSet<ChessMove, RandomState> = HashSet::from_iter(
-            legal_moves_from_origin(&game.board, &knight_location, &game.to_move)
+            legal_moves_from_origin(&game.board, &knight_location, &game.to_move, &game.history)
                 .iter()
                 .cloned(),
         );
@@ -832,7 +977,7 @@ mod tests {
         );
 
         let found_moves: HashSet<ChessMove, RandomState> = HashSet::from_iter(
-            legal_moves_from_origin(&game.board, &knight_location, &game.to_move)
+            legal_moves_from_origin(&game.board, &knight_location, &game.to_move, &game.history)
                 .iter()
                 .cloned(),
         );
@@ -861,7 +1006,8 @@ mod tests {
         let knight_location = Coords { y: 0, x: 0 };
 
         assert_eq!(
-            legal_moves_from_origin(&game.board, &knight_location, &game.to_move).len(),
+            legal_moves_from_origin(&game.board, &knight_location, &game.to_move, &game.history)
+                .len(),
             0
         )
     }
@@ -897,7 +1043,7 @@ mod tests {
         let legal_move_set: HashSet<ChessMove, RandomState> =
             HashSet::from_iter(legal_moves.iter().cloned());
         let found_move_set: HashSet<ChessMove, RandomState> = HashSet::from_iter(
-            legal_moves_from_origin(&game.board, &bishop_location, &game.to_move)
+            legal_moves_from_origin(&game.board, &bishop_location, &game.to_move, &game.history)
                 .iter()
                 .cloned(),
         );
@@ -951,7 +1097,7 @@ mod tests {
         ]);
 
         let found_moves: HashSet<ChessMove, RandomState> = HashSet::from_iter(
-            legal_moves_from_origin(&game.board, &king_location, &game.to_move)
+            legal_moves_from_origin(&game.board, &king_location, &game.to_move, &game.history)
                 .iter()
                 .cloned(),
         );
@@ -971,7 +1117,8 @@ mod tests {
         });
         let king_location = Coords { y: 3, x: 3 };
         assert_eq!(
-            legal_moves_from_origin(&game.board, &king_location, &game.to_move).len(),
+            legal_moves_from_origin(&game.board, &king_location, &game.to_move, &game.history)
+                .len(),
             0
         );
     }
@@ -995,7 +1142,8 @@ mod tests {
                 origin: king_location,
                 destination: Coords { y: 0, x: 1 },
             }),
-            &game.to_move
+            &game.to_move,
+            &game.history
         ));
     }
 
@@ -1018,7 +1166,8 @@ mod tests {
                 origin: king_location,
                 destination: Coords { y: 0, x: 1 },
             }),
-            &game.to_move
+            &game.to_move,
+            &game.history
         ));
     }
 
@@ -1035,7 +1184,12 @@ mod tests {
             color: PieceColor::Black,
         });
         let king_location = Coords { y: 0, x: 1 };
-        assert!(is_attacked(&PieceColor::White, &game.board, &king_location));
+        assert!(is_attacked(
+            &PieceColor::White,
+            &game.board,
+            &king_location,
+            &game.history
+        ));
     }
 
     #[test]
@@ -1050,7 +1204,7 @@ mod tests {
             kind: PieceKind::Knight,
             color: PieceColor::Black,
         });
-        assert!(is_in_check(&PieceColor::White, &game.board));
+        assert!(is_in_check(&PieceColor::White, &game.board, &game.history));
     }
 
     #[test]
@@ -1069,7 +1223,7 @@ mod tests {
             kind: PieceKind::Queen,
             color: PieceColor::Black,
         });
-        assert!(is_checkmate(&game.board, &game.to_move));
+        assert!(is_checkmate(&game.board, &game.to_move, &game.history));
     }
     #[test]
     fn finds_king() {
@@ -1083,6 +1237,37 @@ mod tests {
             king_position(&PieceColor::White, &game.board).unwrap(),
             Coords { x: 0, y: 0 }
         )
+    }
+
+    #[test]
+    fn can_castle_right() {
+        let mut game = Game::empty();
+
+        game.board[0][4] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        game.board[0][7] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        assert!(
+            piece_at(&game.board, &Coords { y: 0, x: 5 }).is_none()
+                && piece_at(&game.board, &Coords { y: 0, x: 6 }).is_none()
+        );
+        assert!(legal_moves_from_origin(
+            &game.board,
+            &Coords { y: 0, x: 4 },
+            &game.to_move,
+            &game.history
+        )
+        .contains(&ChessMove::CastleRight));
+        assert!(is_move_legal(
+            &game.board,
+            &ChessMove::CastleRight,
+            &game.to_move,
+            &game.history
+        ))
     }
 
     #[test]

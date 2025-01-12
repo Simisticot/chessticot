@@ -79,14 +79,18 @@ impl App {
 
     fn select_square(&mut self) {
         self.selected_square = Some(self.cursor.clone());
-        self.highlighted_destinations =
-            legal_moves_from_origin(&self.game.board, &self.cursor, &self.game.to_move)
-                .iter()
-                .filter_map(|chess_move| match chess_move {
-                    ChessMove::RegularMove(coordinates) => Some(coordinates.destination),
-                    _ => None,
-                })
-                .collect();
+        self.highlighted_destinations = legal_moves_from_origin(
+            &self.game.board,
+            &self.cursor,
+            &self.game.to_move,
+            &self.game.history,
+        )
+        .iter()
+        .filter_map(|chess_move| match chess_move {
+            ChessMove::RegularMove(coordinates) => Some(coordinates.destination),
+            _ => None,
+        })
+        .collect();
     }
 
     fn clear_selection(&mut self) {

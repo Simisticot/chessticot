@@ -1,4 +1,4 @@
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct Piece {
     pub kind: PieceKind,
     pub color: PieceColor,
