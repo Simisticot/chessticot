@@ -1,4 +1,6 @@
-use chessticot::{legal_moves_from_origin, ChessMove, Coords, Game, Move, PieceColor, PieceKind};
+use chessticot::{
+    legal_moves_from_origin, piece_at, ChessMove, Coords, Game, Move, PieceColor, PieceKind,
+};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -27,6 +29,8 @@ pub struct App {
     cursor: Coords,
     selected_square: Option<Coords>,
     highlighted_destinations: Vec<Coords>,
+    highlighted_castle_left: bool,
+    highlighted_castle_right: bool,
 }
 
 impl App {
@@ -37,6 +41,8 @@ impl App {
             cursor: Coords { x: 0, y: 0 },
             selected_square: None,
             highlighted_destinations: Vec::new(),
+            highlighted_castle_left: false,
+            highlighted_castle_right: false,
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -70,7 +76,7 @@ impl App {
             KeyCode::Char('j') | KeyCode::Down => self.move_cursor(Coords { x: 0, y: -1 }),
             KeyCode::Char(' ') => match self.selected_square {
                 None => self.select_square(),
-                Some(_) => self.confirm_move(),
+                Some(square) => self.confirm_move(square),
             },
             KeyCode::Esc => self.clear_selection(),
             _ => {}
@@ -79,32 +85,62 @@ impl App {
 
     fn select_square(&mut self) {
         self.selected_square = Some(self.cursor.clone());
-        self.highlighted_destinations = legal_moves_from_origin(
+        let legal_moves = legal_moves_from_origin(
             &self.game.board,
             &self.cursor,
             &self.game.to_move,
             &self.game.history,
-        )
-        .iter()
-        .filter_map(|chess_move| match chess_move {
-            ChessMove::RegularMove(coordinates) => Some(coordinates.destination),
-            _ => None,
-        })
-        .collect();
+        );
+        self.highlighted_destinations = legal_moves
+            .iter()
+            .filter_map(|chess_move| {
+                let starting_row = match self.game.to_move {
+                    PieceColor::White => 0,
+                    PieceColor::Black => 7,
+                };
+                match chess_move {
+                    ChessMove::RegularMove(coordinates) => Some(coordinates.destination),
+                    ChessMove::CastleLeft => Some(Coords {
+                        y: starting_row,
+                        x: 2,
+                    }),
+                    ChessMove::CastleRight => Some(Coords {
+                        y: starting_row,
+                        x: 6,
+                    }),
+                    _ => None,
+                }
+            })
+            .collect();
+        if legal_moves.contains(&ChessMove::CastleRight) {
+            self.highlighted_castle_right = true;
+        }
+        if legal_moves.contains(&ChessMove::CastleLeft) {
+            self.highlighted_castle_left = true;
+        }
     }
 
     fn clear_selection(&mut self) {
         self.selected_square = None;
         self.highlighted_destinations = Vec::new();
+        self.highlighted_castle_right = false;
+        self.highlighted_castle_left = false;
     }
 
-    fn confirm_move(&mut self) {
-        self.game.make_move(&ChessMove::RegularMove(Move {
-            origin: self
-                .selected_square
-                .expect("Should only reach this code if there is a selected square."),
+    fn confirm_move(&mut self, selected_square: Coords) {
+        let mut move_to_make = ChessMove::RegularMove(Move {
+            origin: selected_square,
             destination: self.cursor,
-        }));
+        });
+        if let Some(piece_to_move) = piece_at(&self.game.board, &selected_square) {
+            let row = piece_to_move.color.homerow();
+            if self.cursor == (Coords { y: row, x: 2 }) && self.highlighted_castle_left {
+                move_to_make = ChessMove::CastleLeft;
+            } else if self.cursor == (Coords { y: row, x: 6 }) && self.highlighted_castle_right {
+                move_to_make = ChessMove::CastleRight;
+            }
+        }
+        self.game.make_move(&move_to_make);
 
         self.clear_selection();
     }

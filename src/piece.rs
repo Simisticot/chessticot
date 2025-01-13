@@ -57,4 +57,10 @@ impl PieceColor {
             PieceColor::Black => PieceColor::White,
         }
     }
+    pub fn homerow(&self) -> isize {
+        match self {
+            PieceColor::White => 0,
+            PieceColor::Black => 7,
+        }
+    }
 }

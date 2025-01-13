@@ -121,7 +121,7 @@ fn castle_left(board: &mut Vec<Vec<Option<Piece>>>, color: &PieceColor) {
         PieceColor::Black => 7,
     };
     move_piece(board, Coords { x: 4, y: row }, Coords { x: 2, y: row });
-    move_piece(board, Coords { x: 4, y: row }, Coords { x: 5, y: row });
+    move_piece(board, Coords { x: 0, y: row }, Coords { x: 3, y: row });
 }
 
 fn castle_right(board: &mut Vec<Vec<Option<Piece>>>, color: &PieceColor) {
@@ -130,7 +130,7 @@ fn castle_right(board: &mut Vec<Vec<Option<Piece>>>, color: &PieceColor) {
         PieceColor::Black => 7,
     };
     move_piece(board, Coords { x: 4, y: row }, Coords { x: 6, y: row });
-    move_piece(board, Coords { x: 4, y: row }, Coords { x: 3, y: row });
+    move_piece(board, Coords { x: 7, y: row }, Coords { x: 5, y: row });
 }
 
 fn is_checkmate(board: &Vec<Vec<Option<Piece>>>, to_move: &PieceColor, history: &History) -> bool {
@@ -1268,6 +1268,37 @@ mod tests {
             &game.to_move,
             &game.history
         ))
+    }
+
+    #[test]
+    fn castle_right() {
+        let mut game = Game::empty();
+
+        game.board[0][4] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        game.board[0][7] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        execute_move(&mut game.board, &ChessMove::CastleRight, &PieceColor::White);
+        assert!(piece_at(&game.board, &Coords { y: 0, x: 4 }).is_none());
+        assert!(piece_at(&game.board, &Coords { y: 0, x: 7 }).is_none());
+        assert!(
+            piece_at(&game.board, &Coords { y: 0, x: 6 }).is_some_and(|piece| piece
+                == Piece {
+                    kind: PieceKind::King,
+                    color: PieceColor::White
+                })
+        );
+        assert!(
+            piece_at(&game.board, &Coords { y: 0, x: 5 }).is_some_and(|piece| piece
+                == Piece {
+                    kind: PieceKind::Rook,
+                    color: PieceColor::White
+                })
+        );
     }
 
     #[test]
