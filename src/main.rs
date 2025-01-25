@@ -1,6 +1,4 @@
-use chessticot::{
-    legal_moves_from_origin, piece_at, ChessMove, Coords, Game, Move, PieceColor, PieceKind,
-};
+use chessticot::{legal_moves_from_origin, ChessMove, Coords, Game, PieceColor, PieceKind};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -14,7 +12,7 @@ use ratatui::{
     },
     DefaultTerminal, Frame,
 };
-use std::io;
+use std::{collections::HashMap, io};
 
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
@@ -28,9 +26,7 @@ pub struct App {
     game: Game,
     cursor: Coords,
     selected_square: Option<Coords>,
-    highlighted_destinations: Vec<Coords>,
-    highlighted_castle_left: bool,
-    highlighted_castle_right: bool,
+    highlighted_moves: HashMap<Coords, ChessMove>,
 }
 
 impl App {
@@ -40,9 +36,7 @@ impl App {
             game: Game::start(),
             cursor: Coords { x: 0, y: 0 },
             selected_square: None,
-            highlighted_destinations: Vec::new(),
-            highlighted_castle_left: false,
-            highlighted_castle_right: false,
+            highlighted_moves: HashMap::new(),
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -76,7 +70,7 @@ impl App {
             KeyCode::Char('j') | KeyCode::Down => self.move_cursor(Coords { x: 0, y: -1 }),
             KeyCode::Char(' ') => match self.selected_square {
                 None => self.select_square(),
-                Some(square) => self.confirm_move(square),
+                Some(_) => self.confirm_move(),
             },
             KeyCode::Esc => self.clear_selection(),
             _ => {}
@@ -91,78 +85,45 @@ impl App {
             &self.game.to_move,
             &self.game.history,
         );
-        self.highlighted_destinations = legal_moves
-            .iter()
-            .filter_map(|chess_move| {
-                let starting_row = self.game.to_move.homerow();
-                match chess_move {
-                    ChessMove::RegularMove(coordinates) => Some(coordinates.destination),
-                    ChessMove::PawnSkip(coordinates) => Some(coordinates.destination),
-                    ChessMove::CastleLeft => Some(Coords {
+        legal_moves.iter().for_each(|chess_move| {
+            let starting_row = self.game.to_move.homerow();
+            match chess_move {
+                ChessMove::RegularMove(coordinates) => self
+                    .highlighted_moves
+                    .insert(coordinates.destination, chess_move.clone()),
+                ChessMove::PawnSkip(coordinates) => self
+                    .highlighted_moves
+                    .insert(coordinates.destination, chess_move.clone()),
+                ChessMove::CastleLeft => self.highlighted_moves.insert(
+                    Coords {
                         y: starting_row,
                         x: 2,
-                    }),
-                    ChessMove::CastleRight => Some(Coords {
+                    },
+                    chess_move.clone(),
+                ),
+                ChessMove::CastleRight => self.highlighted_moves.insert(
+                    Coords {
                         y: starting_row,
                         x: 6,
-                    }),
-                    ChessMove::EnPassant(movement, _) => Some(movement.destination),
-                }
-            })
-            .collect();
-        if legal_moves.contains(&ChessMove::CastleRight) {
-            self.highlighted_castle_right = true;
-        }
-        if legal_moves.contains(&ChessMove::CastleLeft) {
-            self.highlighted_castle_left = true;
-        }
+                    },
+                    chess_move.clone(),
+                ),
+                ChessMove::EnPassant(movement, _) => self
+                    .highlighted_moves
+                    .insert(movement.destination, chess_move.clone()),
+            };
+        });
     }
 
     fn clear_selection(&mut self) {
         self.selected_square = None;
-        self.highlighted_destinations = Vec::new();
-        self.highlighted_castle_right = false;
-        self.highlighted_castle_left = false;
+        self.highlighted_moves = HashMap::new();
     }
 
-    fn confirm_move(&mut self, selected_square: Coords) {
-        let mut move_to_make = ChessMove::RegularMove(Move {
-            origin: selected_square,
-            destination: self.cursor,
-        });
-        if let Some(piece_to_move) = piece_at(&self.game.board, &selected_square) {
-            let row = piece_to_move.color.homerow();
-            if self.cursor == (Coords { y: row, x: 2 }) && self.highlighted_castle_left {
-                move_to_make = ChessMove::CastleLeft;
-            } else if self.cursor == (Coords { y: row, x: 6 }) && self.highlighted_castle_right {
-                move_to_make = ChessMove::CastleRight;
-            }
-            if let Some(epo) = self.game.history.en_passant_on {
-                if piece_to_move.kind == PieceKind::Pawn && selected_square.x != self.cursor.x {
-                    move_to_make = ChessMove::EnPassant(
-                        Move {
-                            origin: selected_square,
-                            destination: self.cursor,
-                        },
-                        Coords {
-                            x: epo.x,
-                            y: epo.y + self.game.to_move.opposite().pawn_orientation(),
-                        },
-                    );
-                }
-            }
-
-            if piece_at(&self.game.board, &selected_square)
-                .is_some_and(|piece| piece.kind == PieceKind::Pawn)
-                && (self.cursor.y - selected_square.y).abs() == 2
-            {
-                move_to_make = ChessMove::PawnSkip(Move {
-                    origin: selected_square,
-                    destination: self.cursor,
-                });
-            }
+    fn confirm_move(&mut self) {
+        if let Some(move_to_make) = self.highlighted_moves.get(&self.cursor) {
+            self.game.make_move(&move_to_make);
         }
-        self.game.make_move(&move_to_make);
 
         self.clear_selection();
     }
@@ -250,7 +211,7 @@ impl Widget for &App {
 
                 // highlight possible destinations
                 ctx.layer();
-                for square in &self.highlighted_destinations {
+                for square in self.highlighted_moves.keys() {
                     ctx.draw(&rectangle_for_square(square, Color::LightYellow));
                 }
 
