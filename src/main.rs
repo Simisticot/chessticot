@@ -94,12 +94,10 @@ impl App {
         self.highlighted_destinations = legal_moves
             .iter()
             .filter_map(|chess_move| {
-                let starting_row = match self.game.to_move {
-                    PieceColor::White => 0,
-                    PieceColor::Black => 7,
-                };
+                let starting_row = self.game.to_move.homerow();
                 match chess_move {
                     ChessMove::RegularMove(coordinates) => Some(coordinates.destination),
+                    ChessMove::PawnSkip(coordinates) => Some(coordinates.destination),
                     ChessMove::CastleLeft => Some(Coords {
                         y: starting_row,
                         x: 2,
@@ -108,7 +106,7 @@ impl App {
                         y: starting_row,
                         x: 6,
                     }),
-                    _ => None,
+                    ChessMove::EnPassant(movement, _) => Some(movement.destination),
                 }
             })
             .collect();
@@ -138,6 +136,30 @@ impl App {
                 move_to_make = ChessMove::CastleLeft;
             } else if self.cursor == (Coords { y: row, x: 6 }) && self.highlighted_castle_right {
                 move_to_make = ChessMove::CastleRight;
+            }
+            if let Some(epo) = self.game.history.en_passant_on {
+                if piece_to_move.kind == PieceKind::Pawn && selected_square.x != self.cursor.x {
+                    move_to_make = ChessMove::EnPassant(
+                        Move {
+                            origin: selected_square,
+                            destination: self.cursor,
+                        },
+                        Coords {
+                            x: epo.x,
+                            y: epo.y + self.game.to_move.opposite().pawn_orientation(),
+                        },
+                    );
+                }
+            }
+
+            if piece_at(&self.game.board, &selected_square)
+                .is_some_and(|piece| piece.kind == PieceKind::Pawn)
+                && (self.cursor.y - selected_square.y).abs() == 2
+            {
+                move_to_make = ChessMove::PawnSkip(Move {
+                    origin: selected_square,
+                    destination: self.cursor,
+                });
             }
         }
         self.game.make_move(&move_to_make);
@@ -187,10 +209,10 @@ pub fn piece_display_name(kind: &PieceKind) -> String {
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" Chess Time ".bold());
-        let debug_checkmated = Line::from(format!("{:?}", self.game.checkmated)).blue();
+        let debug_ep = Line::from(format!("{:?}", self.game.history.en_passant_on)).green();
         let block = Block::bordered()
             .title(title.centered())
-            .title_bottom(debug_checkmated.centered())
+            .title_bottom(debug_ep.centered())
             .border_set(border::THICK);
 
         Canvas::default()

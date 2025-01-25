@@ -3,6 +3,7 @@ use std::ops;
 #[derive(PartialEq, Hash, Eq, Debug, Clone)]
 pub enum ChessMove {
     RegularMove(Move),
+    PawnSkip(Move),
     CastleLeft,
     CastleRight,
     EnPassant(Move, Coords),

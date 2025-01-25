@@ -3,7 +3,6 @@ mod piece;
 
 pub use crate::coords::{ChessMove, Coords, Direction, Move};
 pub use crate::piece::{Piece, PieceColor, PieceKind};
-use core::panic;
 use std::usize;
 
 pub struct History {
@@ -13,6 +12,7 @@ pub struct History {
     black_king_moved: bool,
     black_left_rook_moved: bool,
     black_right_rook_moved: bool,
+    pub en_passant_on: Option<Coords>,
 }
 impl History {
     pub fn new() -> History {
@@ -23,6 +23,7 @@ impl History {
             black_king_moved: false,
             black_left_rook_moved: false,
             black_right_rook_moved: false,
+            en_passant_on: None,
         }
     }
 
@@ -92,6 +93,14 @@ impl Game {
     pub fn make_move(&mut self, chess_move: &ChessMove) {
         if is_move_legal(&self.board, chess_move, &self.to_move, &self.history) {
             execute_move(&mut self.board, chess_move, &self.to_move);
+            if let ChessMove::PawnSkip(movement) = chess_move {
+                self.history.en_passant_on = Some(Coords {
+                    x: movement.origin.x,
+                    y: (movement.origin.y + movement.destination.y) / 2 as isize,
+                });
+            } else {
+                self.history.en_passant_on = None;
+            }
             self.to_move = self.to_move.opposite();
             if is_checkmate(&self.board, &self.to_move, &self.history) {
                 self.checkmated = Some(self.to_move.clone());
@@ -103,7 +112,10 @@ impl Game {
 fn execute_move(board: &mut Vec<Vec<Option<Piece>>>, chess_move: &ChessMove, color: &PieceColor) {
     match chess_move {
         ChessMove::RegularMove(coordinates) => {
-            move_piece(board, coordinates.origin, coordinates.destination)
+            move_piece(board, coordinates.origin, coordinates.destination);
+        }
+        ChessMove::PawnSkip(coordinates) => {
+            move_piece(board, coordinates.origin, coordinates.destination);
         }
         ChessMove::CastleLeft => {
             castle_left(board, color);
@@ -111,7 +123,10 @@ fn execute_move(board: &mut Vec<Vec<Option<Piece>>>, chess_move: &ChessMove, col
         ChessMove::CastleRight => {
             castle_right(board, color);
         }
-        _ => panic!("This type of move is not implemented"),
+        ChessMove::EnPassant(movement, pawn_taken) => {
+            move_piece(board, movement.origin, movement.destination);
+            take_piece_at(board, *pawn_taken);
+        }
     }
 }
 
@@ -169,7 +184,9 @@ fn is_move_legal(
     history: &History,
 ) -> bool {
     let origin = match chess_move {
-        ChessMove::RegularMove(regular_move) => regular_move.origin,
+        ChessMove::RegularMove(movement) => movement.origin,
+        ChessMove::PawnSkip(movement) => movement.origin,
+        ChessMove::EnPassant(movement, _) => movement.origin,
         ChessMove::CastleRight | ChessMove::CastleLeft => {
             let row = match to_move {
                 PieceColor::White => 0,
@@ -177,7 +194,6 @@ fn is_move_legal(
             };
             Coords { y: row, x: 4 }
         }
-        _ => return false,
     };
 
     legal_moves_from_origin(board, &origin, to_move, history).contains(chess_move)
@@ -232,7 +248,7 @@ fn movement_from_origin(
     history: &History,
 ) -> Vec<ChessMove> {
     match piece.kind {
-        PieceKind::Pawn => pawn_from(board, origin, &piece.color),
+        PieceKind::Pawn => pawn_from(board, origin, &piece.color, history),
         PieceKind::Rook => rook_from(board, origin, &piece.color),
         PieceKind::Knight => knight_from(board, origin, &piece.color),
         PieceKind::Bishop => bishop_from(board, origin, &piece.color),
@@ -402,19 +418,51 @@ pub fn raycast(
     squares
 }
 
+fn en_passant_from(origin: &Coords, color: &PieceColor, history: &History) -> Option<ChessMove> {
+    match history.en_passant_on {
+        None => None,
+        Some(coordinates) => {
+            for candidate in vec![
+                coordinates
+                    + Direction {
+                        dx: 1,
+                        dy: color.opposite().pawn_orientation(),
+                    },
+                coordinates
+                    + Direction {
+                        dx: -1,
+                        dy: color.opposite().pawn_orientation(),
+                    },
+            ] {
+                if candidate.is_in_bounds() && candidate == *origin {
+                    return Some(ChessMove::EnPassant(
+                        Move {
+                            origin: origin.clone(),
+                            destination: coordinates.clone(),
+                        },
+                        coordinates
+                            + Direction {
+                                dx: 0,
+                                dy: color.opposite().pawn_orientation(),
+                            },
+                    ));
+                }
+            }
+            None
+        }
+    }
+}
+
 fn pawn_from(
     board: &Vec<Vec<Option<Piece>>>,
     origin: &Coords,
     color: &PieceColor,
+    history: &History,
 ) -> Vec<ChessMove> {
-    let vertical_orientation = match color {
-        PieceColor::White => 1,
-        PieceColor::Black => -1,
-    };
     let mut legal_moves = vec![];
     let forward = Direction {
         dx: 0,
-        dy: vertical_orientation,
+        dy: color.pawn_orientation(),
     };
     let ahead_one = *origin + forward;
     let ahead_two = ahead_one + forward;
@@ -432,7 +480,7 @@ fn pawn_from(
             return legal_moves;
         };
         if (origin.y == 1 || origin.y == 6) && piece_at(board, &ahead_two).is_none() {
-            legal_moves.push(ChessMove::RegularMove(Move {
+            legal_moves.push(ChessMove::PawnSkip(Move {
                 origin: origin.clone(),
                 destination: ahead_two,
             }));
@@ -442,11 +490,11 @@ fn pawn_from(
     vec![
         Coords {
             x: origin.x + 1,
-            y: origin.y + vertical_orientation,
+            y: origin.y + color.pawn_orientation(),
         },
         Coords {
             x: origin.x - 1,
-            y: origin.y + vertical_orientation,
+            y: origin.y + color.pawn_orientation(),
         },
     ]
     .iter()
@@ -465,6 +513,9 @@ fn pawn_from(
             }
         }
     });
+    if let Some(en_passant) = en_passant_from(origin, color, &history) {
+        legal_moves.push(en_passant);
+    }
     legal_moves
 }
 
@@ -574,7 +625,7 @@ mod tests {
                     origin: pawn_location,
                     destination: Coords { y: 2, x: 4 }
                 }),
-                ChessMove::RegularMove(Move {
+                ChessMove::PawnSkip(Move {
                     origin: pawn_location,
                     destination: Coords { y: 3, x: 4 }
                 })
@@ -1325,11 +1376,12 @@ mod tests {
     fn scholars_mate() {
         let mut game = Game::start();
 
-        game.make_move(&ChessMove::RegularMove(Move {
+        game.make_move(&ChessMove::PawnSkip(Move {
             origin: Coords { x: 4, y: 1 },
             destination: Coords { x: 4, y: 3 },
         }));
-        game.make_move(&ChessMove::RegularMove(Move {
+        assert!(game.to_move == PieceColor::Black);
+        game.make_move(&ChessMove::PawnSkip(Move {
             origin: Coords { x: 4, y: 6 },
             destination: Coords { x: 4, y: 4 },
         }));
@@ -1337,6 +1389,7 @@ mod tests {
             origin: Coords { x: 3, y: 0 },
             destination: Coords { x: 7, y: 4 },
         }));
+        assert!(game.to_move == PieceColor::Black);
         game.make_move(&ChessMove::RegularMove(Move {
             origin: Coords { x: 1, y: 7 },
             destination: Coords { x: 2, y: 5 },
@@ -1345,6 +1398,7 @@ mod tests {
             origin: Coords { x: 5, y: 0 },
             destination: Coords { x: 2, y: 3 },
         }));
+        assert!(game.to_move == PieceColor::Black);
         game.make_move(&ChessMove::RegularMove(Move {
             origin: Coords { x: 6, y: 7 },
             destination: Coords { x: 5, y: 5 },
@@ -1353,7 +1407,129 @@ mod tests {
             origin: Coords { x: 7, y: 4 },
             destination: Coords { x: 5, y: 6 },
         }));
+        assert!(game.to_move == PieceColor::Black);
 
         assert!(game.checkmated == Some(PieceColor::Black));
+    }
+
+    #[test]
+    fn pawn_skip_is_legal() {
+        let game = Game::start();
+        assert!(is_move_legal(
+            &game.board,
+            &ChessMove::PawnSkip(Move {
+                origin: Coords { x: 4, y: 1 },
+                destination: Coords { x: 4, y: 3 }
+            }),
+            &game.to_move,
+            &game.history
+        ))
+    }
+
+    #[test]
+    fn en_passant_right() {
+        let mut game = Game::empty();
+        game.board[1][1] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        game.board[3][0] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::Black,
+        });
+        game.make_move(&ChessMove::PawnSkip(Move {
+            origin: Coords { y: 1, x: 1 },
+            destination: Coords { y: 3, x: 1 },
+        }));
+        let black_pawn_location = Coords { y: 3, x: 0 };
+        let ep = ChessMove::EnPassant(
+            Move {
+                origin: black_pawn_location,
+                destination: Coords { y: 2, x: 1 },
+            },
+            Coords { y: 3, x: 1 },
+        );
+        assert!(game.history.en_passant_on == Some(Coords { y: 2, x: 1 }));
+        assert!(legal_moves_from_origin(
+            &game.board,
+            &black_pawn_location,
+            &game.to_move,
+            &game.history
+        )
+        .contains(&ep));
+        assert!(is_move_legal(
+            &game.board,
+            &ep,
+            &game.to_move,
+            &game.history
+        ))
+    }
+    #[test]
+    fn en_passant_left() {
+        let mut game = Game::empty();
+        game.board[1][1] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        game.board[3][2] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::Black,
+        });
+        game.make_move(&ChessMove::PawnSkip(Move {
+            origin: Coords { y: 1, x: 1 },
+            destination: Coords { y: 3, x: 1 },
+        }));
+        let black_pawn_location = Coords { y: 3, x: 2 };
+        let ep = ChessMove::EnPassant(
+            Move {
+                origin: black_pawn_location,
+                destination: Coords { y: 2, x: 1 },
+            },
+            Coords { y: 3, x: 1 },
+        );
+        assert!(game.history.en_passant_on == Some(Coords { y: 2, x: 1 }));
+        assert!(legal_moves_from_origin(
+            &game.board,
+            &black_pawn_location,
+            &game.to_move,
+            &game.history
+        )
+        .contains(&ep));
+        assert!(is_move_legal(
+            &game.board,
+            &ep,
+            &game.to_move,
+            &game.history
+        ))
+    }
+    #[test]
+    fn no_en_passant_from_accross_the_board() {
+        let mut game = Game::empty();
+        game.board[1][4] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        game.board[7][2] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::Black,
+        });
+        game.make_move(&ChessMove::PawnSkip(Move {
+            origin: Coords { y: 1, x: 4 },
+            destination: Coords { y: 3, x: 4 },
+        }));
+
+        assert!(game.history.en_passant_on == Some(Coords { y: 2, x: 4 }));
+        assert!(!is_move_legal(
+            &game.board,
+            &ChessMove::EnPassant(
+                Move {
+                    origin: Coords { y: 7, x: 2 },
+                    destination: Coords { y: 2, x: 4 }
+                },
+                Coords { y: 3, x: 4 }
+            ),
+            &game.to_move,
+            &game.history
+        ))
     }
 }

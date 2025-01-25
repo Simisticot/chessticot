@@ -63,4 +63,10 @@ impl PieceColor {
             PieceColor::Black => 7,
         }
     }
+    pub fn pawn_orientation(&self) -> isize {
+        match self {
+            PieceColor::White => 1,
+            PieceColor::Black => -1,
+        }
+    }
 }
