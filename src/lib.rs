@@ -3,6 +3,7 @@ mod piece;
 
 pub use crate::coords::{ChessMove, Coords, Direction, Move};
 pub use crate::piece::{Piece, PieceColor, PieceKind};
+use core::panic;
 use std::usize;
 
 pub struct History {
@@ -127,6 +128,17 @@ fn execute_move(board: &mut Vec<Vec<Option<Piece>>>, chess_move: &ChessMove, col
             move_piece(board, movement.origin, movement.destination);
             take_piece_at(board, *pawn_taken);
         }
+        ChessMove::Promotion(movement, promoted_to) => {
+            take_piece_at(board, movement.origin);
+            put_piece_at(
+                board,
+                Piece {
+                    kind: *promoted_to,
+                    color: color.clone(),
+                },
+                movement.destination,
+            );
+        }
     }
 }
 
@@ -194,6 +206,7 @@ fn is_move_legal(
             };
             Coords { y: row, x: 4 }
         }
+        ChessMove::Promotion(movement, _) => movement.origin,
     };
 
     legal_moves_from_origin(board, &origin, to_move, history).contains(chess_move)
@@ -517,6 +530,25 @@ fn pawn_from(
         legal_moves.push(en_passant);
     }
     legal_moves
+        .iter()
+        .map(|pawn_move| match pawn_move {
+            ChessMove::RegularMove(movement) => {
+                if movement.destination.y == color.opposite().homerow() {
+                    PieceKind::promoteable()
+                        .map(|promotable_kind| {
+                            ChessMove::Promotion(movement.clone(), promotable_kind.clone())
+                        })
+                        .collect()
+                } else {
+                    vec![pawn_move.clone()]
+                }
+            }
+            ChessMove::PawnSkip(_) => vec![pawn_move.clone()],
+            ChessMove::EnPassant(_, _) => vec![pawn_move.clone()],
+            _ => panic!("Pawn moves should only be regular, skip or en passant"),
+        })
+        .flatten()
+        .collect()
 }
 
 fn is_in_check(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>, history: &History) -> bool {

@@ -111,6 +111,9 @@ impl App {
                 ChessMove::EnPassant(movement, _) => self
                     .highlighted_moves
                     .insert(movement.destination, chess_move.clone()),
+                ChessMove::Promotion(movement, _) => self
+                    .highlighted_moves
+                    .insert(movement.destination, chess_move.clone()),
             };
         });
     }

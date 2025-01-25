@@ -34,7 +34,7 @@ impl Piece {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Hash, Copy, Clone, PartialEq, Eq, Debug)]
 pub enum PieceKind {
     Pawn,
     Rook,
@@ -42,6 +42,18 @@ pub enum PieceKind {
     Bishop,
     Queen,
     King,
+}
+
+impl PieceKind {
+    pub fn promoteable() -> std::slice::Iter<'static, PieceKind> {
+        [
+            PieceKind::Rook,
+            PieceKind::Knight,
+            PieceKind::Bishop,
+            PieceKind::Queen,
+        ]
+        .iter()
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]

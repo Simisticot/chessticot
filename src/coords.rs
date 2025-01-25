@@ -1,5 +1,7 @@
 use std::ops;
 
+use crate::PieceKind;
+
 #[derive(PartialEq, Hash, Eq, Debug, Clone)]
 pub enum ChessMove {
     RegularMove(Move),
@@ -7,6 +9,7 @@ pub enum ChessMove {
     CastleLeft,
     CastleRight,
     EnPassant(Move, Coords),
+    Promotion(Move, PieceKind),
 }
 
 #[derive(PartialEq, Debug, Eq, Hash, Clone)]
