@@ -3,7 +3,6 @@ mod piece;
 
 pub use crate::coords::{ChessMove, Coords, Direction, Move};
 pub use crate::piece::{Piece, PieceColor, PieceKind};
-use core::panic;
 use std::usize;
 
 pub struct History {
@@ -1563,5 +1562,32 @@ mod tests {
             &game.to_move,
             &game.history
         ))
+    }
+    #[test]
+    fn promotion() {
+        let mut game = Game::empty();
+        game.board[6][0] = Some(Piece {
+            kind: PieceKind::Pawn,
+            color: PieceColor::White,
+        });
+        let pawn_position = Coords { y: 6, x: 0 };
+        dbg!(legal_moves_from_origin(
+            &game.board,
+            &pawn_position,
+            &PieceColor::White,
+            &game.history
+        ));
+        assert_eq!(PieceColor::White.opposite().homerow(), 7 as isize);
+        legal_moves_from_origin(
+            &game.board,
+            &pawn_position,
+            &PieceColor::White,
+            &game.history,
+        )
+        .iter()
+        .for_each(|chess_move| match chess_move {
+            ChessMove::Promotion(_, _) => (),
+            _ => panic!("expected only promotions, found {:?}", chess_move),
+        });
     }
 }
