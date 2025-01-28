@@ -276,10 +276,7 @@ fn king_movement(
     history: &History,
 ) -> Vec<ChessMove> {
     let mut moves = projected_movement(board, origin, eight_degrees(), origin_color, Some(1));
-    let row = match origin_color {
-        PieceColor::White => 0,
-        PieceColor::Black => 7,
-    };
+    let row = origin_color.homerow();
     if piece_at(board, &Coords { y: row, x: 5 }).is_none()
         && piece_at(board, &Coords { y: row, x: 6 }).is_none()
         && piece_at(board, &Coords { y: row, x: 4 }).is_some_and(|piece| {
@@ -488,10 +485,10 @@ fn pawn_from(
             origin: origin.clone(),
             destination: ahead_one,
         }));
-        if !ahead_two.is_in_bounds() {
-            return legal_moves;
-        };
-        if (origin.y == 1 || origin.y == 6) && piece_at(board, &ahead_two).is_none() {
+        if ahead_two.is_in_bounds()
+            && (origin.y == 1 || origin.y == 6)
+            && piece_at(board, &ahead_two).is_none()
+        {
             legal_moves.push(ChessMove::PawnSkip(Move {
                 origin: origin.clone(),
                 destination: ahead_two,
