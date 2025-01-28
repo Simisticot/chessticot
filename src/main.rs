@@ -12,7 +12,7 @@ use ratatui::{
     },
     DefaultTerminal, Frame,
 };
-use std::{collections::HashMap, io};
+use std::{collections::HashMap, io, iter::Cycle};
 
 fn main() -> io::Result<()> {
     let mut terminal = ratatui::init();
@@ -27,6 +27,8 @@ pub struct App {
     cursor: Coords,
     selected_square: Option<Coords>,
     highlighted_moves: HashMap<Coords, ChessMove>,
+    promoting_to: PieceKind,
+    promotion_target: Cycle<std::slice::Iter<'static, PieceKind>>,
 }
 
 impl App {
@@ -37,6 +39,8 @@ impl App {
             cursor: Coords { x: 0, y: 0 },
             selected_square: None,
             highlighted_moves: HashMap::new(),
+            promoting_to: PieceKind::Queen,
+            promotion_target: PieceKind::promoteable().cycle(),
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -73,8 +77,13 @@ impl App {
                 Some(_) => self.confirm_move(),
             },
             KeyCode::Esc => self.clear_selection(),
+            KeyCode::Tab => self.cycle_promoting_to(),
             _ => {}
         }
+    }
+
+    fn cycle_promoting_to(&mut self) {
+        self.promoting_to = *self.promotion_target.next().expect("should cycle");
     }
 
     fn select_square(&mut self) {
@@ -125,7 +134,14 @@ impl App {
 
     fn confirm_move(&mut self) {
         if let Some(move_to_make) = self.highlighted_moves.get(&self.cursor) {
-            self.game.make_move(&move_to_make);
+            if let ChessMove::Promotion(movement, _) = move_to_make {
+                self.game.make_move(&ChessMove::Promotion(
+                    movement.clone(),
+                    self.promoting_to.clone(),
+                ));
+            } else {
+                self.game.make_move(&move_to_make);
+            }
         }
 
         self.clear_selection();
@@ -173,10 +189,12 @@ pub fn piece_display_name(kind: &PieceKind) -> String {
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" Chess Time ".bold());
-        let debug_ep = Line::from(format!("{:?}", self.game.history.en_passant_on)).green();
+        let promoting_to_label = Line::from(format!("promoting to {:?}", self.promoting_to))
+            .centered()
+            .green();
         let block = Block::bordered()
             .title(title.centered())
-            .title_bottom(debug_ep.centered())
+            .title_bottom(promoting_to_label)
             .border_set(border::THICK);
 
         Canvas::default()
