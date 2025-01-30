@@ -88,14 +88,9 @@ impl App {
 
     fn select_square(&mut self) {
         self.selected_square = Some(self.cursor.clone());
-        let legal_moves = legal_moves_from_origin(
-            &self.game.board,
-            &self.cursor,
-            &self.game.to_move,
-            &self.game.history,
-        );
+        let legal_moves = legal_moves_from_origin(&self.cursor, &self.game.current_position);
         legal_moves.iter().for_each(|chess_move| {
-            let starting_row = self.game.to_move.homerow();
+            let starting_row = self.game.current_position.to_move.homerow();
             match chess_move {
                 ChessMove::RegularMove(coordinates) => self
                     .highlighted_moves
@@ -212,7 +207,7 @@ impl Widget for &App {
                             },
                             Color::White,
                         ));
-                        match &self.game.board[i][j] {
+                        match &self.game.current_position.board[i][j] {
                             Some(piece) => ctx.print(
                                 (SQUARE_SIDE) * j as f64 - OFFSET + SQUARE_SIDE / 4.0,
                                 (SQUARE_SIDE) * i as f64 - OFFSET + SQUARE_SIDE / 2.0,
