@@ -222,7 +222,7 @@ impl Position {
             .any(|attacks_square| attacks_square)
     }
     fn is_in_check(&self, color: &PieceColor) -> bool {
-        match king_position(color, &self.board) {
+        match self.king_location(color) {
             None => false,
             Some(loc) => self.is_attacked_by(&color.opposite(), &loc),
         }
@@ -463,6 +463,19 @@ impl Position {
             }
         }
     }
+    fn king_location(&self, color: &PieceColor) -> Option<Coords> {
+        for i in 0..8 {
+            for j in 0..8 {
+                let loc = Coords { y: i, x: j };
+                if piece_at(&self.board, &loc)
+                    .is_some_and(|piece| piece.kind == PieceKind::King && piece.color == *color)
+                {
+                    return Some(loc);
+                }
+            }
+        }
+        None
+    }
 }
 
 fn castle_left(board: &mut Vec<Vec<Option<Piece>>>, color: &PieceColor) {
@@ -536,20 +549,6 @@ fn all_squares() -> Vec<Coords> {
         }
     }
     squares
-}
-
-fn king_position(color: &PieceColor, board: &Vec<Vec<Option<Piece>>>) -> Option<Coords> {
-    for i in 0..8 {
-        for j in 0..8 {
-            let loc = Coords { y: i, x: j };
-            if piece_at(&board, &loc)
-                .is_some_and(|piece| piece.kind == PieceKind::King && piece.color == *color)
-            {
-                return Some(loc);
-            }
-        }
-    }
-    None
 }
 
 fn move_piece(board: &mut Vec<Vec<Option<Piece>>>, origin: Coords, dest: Coords) {
@@ -1163,10 +1162,7 @@ mod tests {
             origin: king_location,
             destination: king_destination,
         }));
-        assert!(
-            king_position(&PieceColor::White, &new_position.board)
-                == Some(king_destination.clone())
-        );
+        assert!(new_position.king_location(&PieceColor::White) == Some(king_destination.clone()));
         assert!(new_position.is_attacked_by(&PieceColor::Black, &king_destination,));
         assert!(new_position.is_in_check(&PieceColor::White));
     }
@@ -1268,7 +1264,7 @@ mod tests {
             color: PieceColor::White,
         });
         assert_eq!(
-            king_position(&PieceColor::White, &position.board).unwrap(),
+            position.king_location(&PieceColor::White).unwrap(),
             Coords { x: 0, y: 0 }
         )
     }
