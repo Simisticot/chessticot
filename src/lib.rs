@@ -126,10 +126,30 @@ impl Position {
                 });
             }
             ChessMove::CastleLeft => {
-                castle_left(&mut new_board, &self.to_move);
+                let row = self.to_move.homerow();
+                move_piece(
+                    &mut new_board,
+                    Coords { x: 4, y: row },
+                    Coords { x: 2, y: row },
+                );
+                move_piece(
+                    &mut new_board,
+                    Coords { x: 0, y: row },
+                    Coords { x: 3, y: row },
+                );
             }
             ChessMove::CastleRight => {
-                castle_right(&mut new_board, &self.to_move);
+                let row = self.to_move.homerow();
+                move_piece(
+                    &mut new_board,
+                    Coords { x: 4, y: row },
+                    Coords { x: 6, y: row },
+                );
+                move_piece(
+                    &mut new_board,
+                    Coords { x: 7, y: row },
+                    Coords { x: 5, y: row },
+                );
             }
             ChessMove::EnPassant(movement, pawn_taken) => {
                 move_piece(&mut new_board, movement.origin, movement.destination);
@@ -476,24 +496,6 @@ impl Position {
         }
         None
     }
-}
-
-fn castle_left(board: &mut Vec<Vec<Option<Piece>>>, color: &PieceColor) {
-    let row = match color {
-        PieceColor::White => 0,
-        PieceColor::Black => 7,
-    };
-    move_piece(board, Coords { x: 4, y: row }, Coords { x: 2, y: row });
-    move_piece(board, Coords { x: 0, y: row }, Coords { x: 3, y: row });
-}
-
-fn castle_right(board: &mut Vec<Vec<Option<Piece>>>, color: &PieceColor) {
-    let row = match color {
-        PieceColor::White => 0,
-        PieceColor::Black => 7,
-    };
-    move_piece(board, Coords { x: 4, y: row }, Coords { x: 6, y: row });
-    move_piece(board, Coords { x: 7, y: row }, Coords { x: 5, y: row });
 }
 
 fn projected_movement(
