@@ -5,7 +5,7 @@ mod piece;
 
 pub use crate::board_manip::{move_piece, piece_at, put_piece_at, take_piece_at};
 pub use crate::chess_move::{ChessMove, Move};
-pub use crate::coords::{cards, eight_degrees, inter_cards, Coords, Direction};
+pub use crate::coords::{all_squares, cards, eight_degrees, inter_cards, Coords, Direction};
 pub use crate::piece::{Piece, PieceColor, PieceKind};
 
 pub struct Game {
@@ -542,16 +542,6 @@ pub fn raycast(
             break;
         }
         squares.push(next_square);
-    }
-    squares
-}
-
-fn all_squares() -> Vec<Coords> {
-    let mut squares = Vec::new();
-    for i in 0..8 {
-        for j in 0..8 {
-            squares.push(Coords { y: i, x: j });
-        }
     }
     squares
 }

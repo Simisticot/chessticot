@@ -11,6 +11,15 @@ impl Coords {
         self.x < 8 && self.x >= 0 && self.y < 8 && self.y >= 0
     }
 }
+pub fn all_squares() -> Vec<Coords> {
+    let mut squares = Vec::new();
+    for i in 0..8 {
+        for j in 0..8 {
+            squares.push(Coords { y: i, x: j });
+        }
+    }
+    squares
+}
 
 impl ops::Add<Direction> for Coords {
     type Output = Coords;
