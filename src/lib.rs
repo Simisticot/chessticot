@@ -286,8 +286,7 @@ impl Position {
         }
     }
     fn king_movement(&self, origin: &Coords, origin_color: &PieceColor) -> Vec<ChessMove> {
-        let mut moves =
-            projected_movement(&self.board, origin, eight_degrees(), origin_color, Some(1));
+        let mut moves = self.projected_movement(origin, eight_degrees(), origin_color, Some(1));
         let row = origin_color.homerow();
         if piece_at(&self.board, &Coords { y: row, x: 5 }).is_none()
             && piece_at(&self.board, &Coords { y: row, x: 6 }).is_none()
@@ -336,10 +335,10 @@ impl Position {
         moves
     }
     fn queen_movement(&self, origin: &Coords, color: &PieceColor) -> Vec<ChessMove> {
-        projected_movement(&self.board, origin, eight_degrees(), color, None)
+        self.projected_movement(origin, eight_degrees(), color, None)
     }
     fn bishop_from(&self, origin: &Coords, color: &PieceColor) -> Vec<ChessMove> {
-        projected_movement(&self.board, origin, inter_cards(), color, None)
+        self.projected_movement(origin, inter_cards(), color, None)
     }
     fn knight_from(&self, origin: &Coords, color: &PieceColor) -> Vec<ChessMove> {
         let directions: Vec<Direction> = vec![
@@ -371,7 +370,7 @@ impl Position {
             .collect()
     }
     fn rook_from(&self, origin: &Coords, color: &PieceColor) -> Vec<ChessMove> {
-        projected_movement(&self.board, origin, cards(), color, None)
+        self.projected_movement(origin, cards(), color, None)
     }
     fn pawn_from(&self, origin: &Coords, color: &PieceColor) -> Vec<ChessMove> {
         let mut legal_moves = vec![];
@@ -499,51 +498,50 @@ impl Position {
         }
         None
     }
-}
-
-fn projected_movement(
-    board: &Vec<Vec<Option<Piece>>>,
-    origin: &Coords,
-    directions: Vec<Direction>,
-    origin_color: &PieceColor,
-    limit: Option<isize>,
-) -> Vec<ChessMove> {
-    directions
-        .iter()
-        .map(|dir| raycast(board, origin, dir, origin_color, limit))
-        .flatten()
-        .map(|destination| {
-            ChessMove::RegularMove(Move {
-                origin: origin.clone(),
-                destination,
+    fn projected_movement(
+        &self,
+        origin: &Coords,
+        directions: Vec<Direction>,
+        origin_color: &PieceColor,
+        limit: Option<isize>,
+    ) -> Vec<ChessMove> {
+        directions
+            .iter()
+            .map(|dir| self.raycast(origin, dir, origin_color, limit))
+            .flatten()
+            .map(|destination| {
+                ChessMove::RegularMove(Move {
+                    origin: origin.clone(),
+                    destination,
+                })
             })
-        })
-        .collect()
-}
-pub fn raycast(
-    board: &Vec<Vec<Option<Piece>>>,
-    origin: &Coords,
-    direction: &Direction,
-    origin_color: &PieceColor,
-    limit: Option<isize>,
-) -> Vec<Coords> {
-    let limit = limit.unwrap_or(7) + 1;
-    let mut squares = vec![];
-    // for instead of loop to avoid potential infinite loop
-    for i in 1..limit {
-        let next_square = *origin + (*direction * i);
-        if !next_square.is_in_bounds() {
-            break;
-        }
-        if let Some(piece) = piece_at(board, &next_square) {
-            if piece.color == origin_color.opposite() {
-                squares.push(next_square);
-            }
-            break;
-        }
-        squares.push(next_square);
+            .collect()
     }
-    squares
+    pub fn raycast(
+        &self,
+        origin: &Coords,
+        direction: &Direction,
+        origin_color: &PieceColor,
+        limit: Option<isize>,
+    ) -> Vec<Coords> {
+        let limit = limit.unwrap_or(7) + 1;
+        let mut squares = vec![];
+        // for instead of loop to avoid potential infinite loop
+        for i in 1..limit {
+            let next_square = *origin + (*direction * i);
+            if !next_square.is_in_bounds() {
+                break;
+            }
+            if let Some(piece) = piece_at(&self.board, &next_square) {
+                if piece.color == origin_color.opposite() {
+                    squares.push(next_square);
+                }
+                break;
+            }
+            squares.push(next_square);
+        }
+        squares
+    }
 }
 
 #[cfg(test)]
