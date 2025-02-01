@@ -1,7 +1,7 @@
 mod coords;
 mod piece;
 
-pub use crate::coords::{ChessMove, Coords, Direction, Move};
+pub use crate::coords::{cards, eight_degrees, inter_cards, ChessMove, Coords, Direction, Move};
 pub use crate::piece::{Piece, PieceColor, PieceKind};
 use std::usize;
 
@@ -564,29 +564,6 @@ pub fn take_piece_at(board: &mut Vec<Vec<Option<Piece>>>, loc: Coords) -> Option
 }
 pub fn put_piece_at(board: &mut Vec<Vec<Option<Piece>>>, piece: Piece, loc: Coords) {
     board[loc.y as usize][loc.x as usize] = Some(piece);
-}
-
-fn eight_degrees() -> Vec<Direction> {
-    let mut directions: Vec<Direction> = vec![];
-    directions.append(&mut cards());
-    directions.append(&mut inter_cards());
-    directions
-}
-
-fn inter_cards() -> Vec<Direction> {
-    let up_right = Direction { dy: 1, dx: 1 };
-    let down_left = Direction { dy: -1, dx: -1 };
-    let up_left = Direction { dy: 1, dx: -1 };
-    let down_right = Direction { dy: -1, dx: 1 };
-    vec![up_right, down_left, up_left, down_right]
-}
-
-fn cards() -> Vec<Direction> {
-    let up = Direction { dx: 0, dy: 1 };
-    let down = Direction { dx: 0, dy: -1 };
-    let left = Direction { dx: -1, dy: 0 };
-    let right = Direction { dx: 1, dy: 0 };
-    vec![up, down, left, right]
 }
 
 #[cfg(test)]

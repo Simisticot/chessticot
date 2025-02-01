@@ -55,3 +55,26 @@ impl ops::Mul<isize> for Direction {
         }
     }
 }
+
+pub fn eight_degrees() -> Vec<Direction> {
+    let mut directions: Vec<Direction> = vec![];
+    directions.append(&mut cards());
+    directions.append(&mut inter_cards());
+    directions
+}
+
+pub fn inter_cards() -> Vec<Direction> {
+    let up_right = Direction { dy: 1, dx: 1 };
+    let down_left = Direction { dy: -1, dx: -1 };
+    let up_left = Direction { dy: 1, dx: -1 };
+    let down_right = Direction { dy: -1, dx: 1 };
+    vec![up_right, down_left, up_left, down_right]
+}
+
+pub fn cards() -> Vec<Direction> {
+    let up = Direction { dx: 0, dy: 1 };
+    let down = Direction { dx: 0, dy: -1 };
+    let left = Direction { dx: -1, dy: 0 };
+    let right = Direction { dx: 1, dy: 0 };
+    vec![up, down, left, right]
+}
