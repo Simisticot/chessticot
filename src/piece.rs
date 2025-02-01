@@ -56,7 +56,7 @@ impl PieceKind {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Eq, Hash, Copy, Clone, PartialEq, Debug)]
 pub enum PieceColor {
     Black,
     White,

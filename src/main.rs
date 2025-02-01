@@ -1,4 +1,5 @@
-use chessticot::{ChessMove, Coords, Game, PieceColor, PieceKind};
+use chessticot::{ChessMove, Coords, Game, PieceColor, PieceKind, Player, RandomPlayer};
+use core::panic;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -21,6 +22,11 @@ fn main() -> io::Result<()> {
     app_result
 }
 
+enum PlayerKind {
+    Human,
+    Engine(Box<dyn Player>),
+}
+
 pub struct App {
     exit: bool,
     game: Game,
@@ -29,6 +35,7 @@ pub struct App {
     highlighted_moves: HashMap<Coords, ChessMove>,
     promoting_to: PieceKind,
     promotion_target: Cycle<std::slice::Iter<'static, PieceKind>>,
+    mode_by_color: HashMap<PieceColor, PlayerKind>,
 }
 
 impl App {
@@ -41,6 +48,13 @@ impl App {
             highlighted_moves: HashMap::new(),
             promoting_to: PieceKind::Queen,
             promotion_target: PieceKind::promoteable().cycle(),
+            mode_by_color: HashMap::from([
+                (
+                    PieceColor::White,
+                    PlayerKind::Engine(Box::new(RandomPlayer {})),
+                ),
+                (PieceColor::Black, PlayerKind::Human),
+            ]),
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -56,12 +70,30 @@ impl App {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
+        match self
+            .mode_by_color
+            .get(&self.game.current_position.to_move)
+            .expect("both colors set in constructor")
+        {
+            PlayerKind::Engine(player) => {
+                let offered_move = player.offer_move(&self.game.current_position);
+                if self.game.current_position.is_move_legal(&offered_move) {
+                    self.game.current_position =
+                        self.game.current_position.after_move(&offered_move);
+                } else {
+                    panic!("engine offered illegal move");
+                }
             }
-            _ => {}
-        };
+            PlayerKind::Human => {
+                match event::read()? {
+                    Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                        self.handle_key_event(key_event)
+                    }
+                    _ => {}
+                };
+            }
+        }
+
         Ok(())
     }
 
