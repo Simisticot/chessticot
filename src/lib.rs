@@ -1,7 +1,9 @@
+mod chess_move;
 mod coords;
 mod piece;
 
-pub use crate::coords::{cards, eight_degrees, inter_cards, ChessMove, Coords, Direction, Move};
+pub use crate::chess_move::{ChessMove, Move};
+pub use crate::coords::{cards, eight_degrees, inter_cards, Coords, Direction};
 pub use crate::piece::{Piece, PieceColor, PieceKind};
 use std::usize;
 
