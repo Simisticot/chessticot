@@ -405,7 +405,7 @@ impl Position {
                 }
             }
         });
-        if let Some(en_passant) = en_passant_from(origin, color, self) {
+        if let Some(en_passant) = self.en_passant_from(origin, color) {
             legal_moves.push(en_passant);
         }
         legal_moves
@@ -428,6 +428,40 @@ impl Position {
             })
             .flatten()
             .collect()
+    }
+    fn en_passant_from(&self, origin: &Coords, color: &PieceColor) -> Option<ChessMove> {
+        match self.en_passant_on {
+            None => None,
+            Some(coordinates) => {
+                for candidate in vec![
+                    coordinates
+                        + Direction {
+                            dx: 1,
+                            dy: color.opposite().pawn_orientation(),
+                        },
+                    coordinates
+                        + Direction {
+                            dx: -1,
+                            dy: color.opposite().pawn_orientation(),
+                        },
+                ] {
+                    if candidate.is_in_bounds() && candidate == *origin {
+                        return Some(ChessMove::EnPassant(
+                            Move {
+                                origin: origin.clone(),
+                                destination: coordinates.clone(),
+                            },
+                            coordinates
+                                + Direction {
+                                    dx: 0,
+                                    dy: color.opposite().pawn_orientation(),
+                                },
+                        ));
+                    }
+                }
+                None
+            }
+        }
     }
 }
 
@@ -492,41 +526,6 @@ pub fn raycast(
         squares.push(next_square);
     }
     squares
-}
-
-fn en_passant_from(origin: &Coords, color: &PieceColor, position: &Position) -> Option<ChessMove> {
-    match position.en_passant_on {
-        None => None,
-        Some(coordinates) => {
-            for candidate in vec![
-                coordinates
-                    + Direction {
-                        dx: 1,
-                        dy: color.opposite().pawn_orientation(),
-                    },
-                coordinates
-                    + Direction {
-                        dx: -1,
-                        dy: color.opposite().pawn_orientation(),
-                    },
-            ] {
-                if candidate.is_in_bounds() && candidate == *origin {
-                    return Some(ChessMove::EnPassant(
-                        Move {
-                            origin: origin.clone(),
-                            destination: coordinates.clone(),
-                        },
-                        coordinates
-                            + Direction {
-                                dx: 0,
-                                dy: color.opposite().pawn_orientation(),
-                            },
-                    ));
-                }
-            }
-            None
-        }
-    }
 }
 
 fn all_squares() -> Vec<Coords> {
