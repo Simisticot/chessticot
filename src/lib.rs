@@ -1,11 +1,12 @@
+mod board_manip;
 mod chess_move;
 mod coords;
 mod piece;
 
+pub use crate::board_manip::{move_piece, piece_at, put_piece_at, take_piece_at};
 pub use crate::chess_move::{ChessMove, Move};
 pub use crate::coords::{cards, eight_degrees, inter_cards, Coords, Direction};
 pub use crate::piece::{Piece, PieceColor, PieceKind};
-use std::usize;
 
 pub struct Game {
     pub current_position: Position,
@@ -553,21 +554,6 @@ fn all_squares() -> Vec<Coords> {
         }
     }
     squares
-}
-
-fn move_piece(board: &mut Vec<Vec<Option<Piece>>>, origin: Coords, dest: Coords) {
-    if let Some(origin_piece) = take_piece_at(board, origin) {
-        put_piece_at(board, origin_piece, dest);
-    }
-}
-pub fn piece_at(board: &Vec<Vec<Option<Piece>>>, loc: &Coords) -> Option<Piece> {
-    board[loc.y as usize][loc.x as usize].clone()
-}
-pub fn take_piece_at(board: &mut Vec<Vec<Option<Piece>>>, loc: Coords) -> Option<Piece> {
-    board[loc.y as usize][loc.x as usize].take()
-}
-pub fn put_piece_at(board: &mut Vec<Vec<Option<Piece>>>, piece: Piece, loc: Coords) {
-    board[loc.y as usize][loc.x as usize] = Some(piece);
 }
 
 #[cfg(test)]
