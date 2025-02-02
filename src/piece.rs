@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Copy, Clone, PartialEq)]
 pub struct Piece {
     pub kind: PieceKind,
@@ -79,6 +81,19 @@ impl PieceColor {
         match self {
             PieceColor::White => 1,
             PieceColor::Black => -1,
+        }
+    }
+
+    pub fn both() -> std::array::IntoIter<PieceColor, 2> {
+        [PieceColor::White, PieceColor::Black].into_iter()
+    }
+}
+
+impl Display for PieceColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PieceColor::Black => write!(f, "Black"),
+            PieceColor::White => write!(f, "White"),
         }
     }
 }

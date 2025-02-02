@@ -511,6 +511,14 @@ impl Position {
         }
         squares
     }
+    pub fn piece_count(&self, color: PieceColor) -> usize {
+        all_squares()
+            .iter()
+            .filter(|square| {
+                piece_at(&self.board, square).is_some_and(|piece| piece.color == color)
+            })
+            .count()
+    }
 }
 
 #[cfg(test)]

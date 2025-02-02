@@ -1,4 +1,4 @@
-use chessticot::{ChessMove, Coords, Game, PieceColor, PieceKind, Player, RandomPlayer};
+use chessticot::{ChessMove, Coords, Game, PieceColor, PieceKind, Player, RandomCapturePrioPlayer};
 use core::panic;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -9,7 +9,7 @@ use ratatui::{
     text::Line,
     widgets::{
         canvas::{Canvas, Rectangle},
-        Block, Widget,
+        Block, Paragraph, Widget, Wrap,
     },
     DefaultTerminal, Frame,
 };
@@ -22,9 +22,10 @@ fn main() -> io::Result<()> {
     app_result
 }
 
-enum PlayerKind {
-    Human,
-    Engine(Box<dyn Player>),
+enum Screen {
+    MainMenu,
+    Game,
+    Result,
 }
 
 pub struct App {
@@ -35,7 +36,10 @@ pub struct App {
     highlighted_moves: HashMap<Coords, ChessMove>,
     promoting_to: PieceKind,
     promotion_target: Cycle<std::slice::Iter<'static, PieceKind>>,
-    mode_by_color: HashMap<PieceColor, PlayerKind>,
+    selectable_colors: Cycle<std::array::IntoIter<PieceColor, 2>>,
+    selected_color: PieceColor,
+    current_screen: Screen,
+    selected_engine: Box<dyn Player>,
 }
 
 impl App {
@@ -48,13 +52,10 @@ impl App {
             highlighted_moves: HashMap::new(),
             promoting_to: PieceKind::Queen,
             promotion_target: PieceKind::promoteable().cycle(),
-            mode_by_color: HashMap::from([
-                (
-                    PieceColor::White,
-                    PlayerKind::Engine(Box::new(RandomPlayer {})),
-                ),
-                (PieceColor::Black, PlayerKind::Human),
-            ]),
+            selectable_colors: PieceColor::both().cycle(),
+            selected_color: PieceColor::White,
+            current_screen: Screen::MainMenu,
+            selected_engine: Box::new(RandomCapturePrioPlayer {}),
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -70,34 +71,65 @@ impl App {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        match self
-            .mode_by_color
-            .get(&self.game.current_position.to_move)
-            .expect("both colors set in constructor")
-        {
-            PlayerKind::Engine(player) => {
-                let offered_move = player.offer_move(&self.game.current_position);
-                if self.game.current_position.is_move_legal(&offered_move) {
-                    self.game.current_position =
-                        self.game.current_position.after_move(&offered_move);
-                } else {
-                    panic!("engine offered illegal move");
+        let _ = match self.current_screen {
+            Screen::MainMenu => self.handle_events_main_menu(),
+            Screen::Game => self.handle_events_game(),
+            Screen::Result => self.handle_events_result(),
+        };
+        Ok(())
+    }
+    fn handle_events_result(&mut self) -> io::Result<()> {
+        match event::read()? {
+            Event::Key(key_event) => match key_event.code {
+                KeyCode::Char('q') => self.exit(),
+                _ => {}
+            },
+            _ => {}
+        };
+        Ok(())
+    }
+    fn handle_events_game(&mut self) -> io::Result<()> {
+        if self.game.checkmated.is_some() {
+            self.current_screen = Screen::Result;
+            return Ok(());
+        }
+        if self.game.current_position.to_move == self.selected_color {
+            match event::read()? {
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                    self.handle_key_event_game(key_event)
                 }
-            }
-            PlayerKind::Human => {
-                match event::read()? {
-                    Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                        self.handle_key_event(key_event)
-                    }
-                    _ => {}
-                };
+                _ => {}
+            };
+        } else {
+            let offered_move = self.selected_engine.offer_move(&self.game.current_position);
+            if self.game.current_position.is_move_legal(&offered_move) {
+                self.game.current_position = self.game.current_position.after_move(&offered_move);
+            } else {
+                panic!("engine offered illegal move");
             }
         }
 
         Ok(())
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
+    fn handle_events_main_menu(&mut self) -> io::Result<()> {
+        match event::read()? {
+            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                match key_event.code {
+                    KeyCode::Right | KeyCode::Left => {
+                        self.selected_color = self.selectable_colors.next().unwrap()
+                    }
+                    KeyCode::Enter => self.current_screen = Screen::Game,
+                    KeyCode::Char('q') => self.exit(),
+                    _ => (),
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn handle_key_event_game(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('h') | KeyCode::Left => self.move_cursor(Coords { x: -1, y: 0 }),
@@ -218,67 +250,100 @@ pub fn piece_display_name(kind: &PieceKind) -> String {
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" Chess Time ".bold());
-        let promoting_to_label = Line::from(format!("promoting to {:?}", self.promoting_to))
-            .centered()
-            .green();
-        let block = Block::bordered()
-            .title(title.centered())
-            .title_bottom(promoting_to_label)
-            .border_set(border::THICK);
+        match self.current_screen {
+            Screen::MainMenu => {
+                let color_selection_title = Line::from(" Choose color ".bold());
+                let color_selection_text = Line::from(format!("Play as {}", self.selected_color));
+                let color_selection_block = Block::bordered()
+                    .title(color_selection_title.centered())
+                    .border_set(border::THICK);
+                Paragraph::new(color_selection_text.white().centered())
+                    .wrap(Wrap { trim: true })
+                    .block(color_selection_block)
+                    .render(area, buf);
+            }
+            Screen::Result => {
+                let result_title = Line::from(" Game Over ".bold());
+                let result_text = Line::from(format!(
+                    " {} wins by checkmate !",
+                    self.game
+                        .checkmated
+                        .expect("should only render this if a player is checkmated")
+                        .opposite()
+                ));
+                let result_card = Block::bordered()
+                    .title(result_title.centered())
+                    .border_set(border::THICK);
+                Paragraph::new(result_text.white().centered())
+                    .wrap(Wrap { trim: true })
+                    .block(result_card)
+                    .render(area, buf);
+            }
+            Screen::Game => {
+                let title = Line::from(" Chess Time ".bold());
+                let promoting_to_label =
+                    Line::from(format!("promoting to {:?}", self.promoting_to))
+                        .centered()
+                        .green();
+                let block = Block::bordered()
+                    .title(title.centered())
+                    .title_bottom(promoting_to_label)
+                    .border_set(border::THICK);
 
-        Canvas::default()
-            .block(block)
-            .x_bounds([-180.0, 180.0])
-            .y_bounds([-90.0, 90.0])
-            .paint(|ctx| {
-                // draw the grid and pieces
-                for i in 0..8 {
-                    for j in 0..8 {
-                        ctx.draw(&rectangle_for_square(
-                            &Coords {
-                                x: j as isize,
-                                y: i as isize,
-                            },
-                            Color::White,
-                        ));
-                        match &self.game.current_position.board[i][j] {
-                            Some(piece) => ctx.print(
-                                (SQUARE_SIDE) * j as f64 - OFFSET + SQUARE_SIDE / 4.0,
-                                (SQUARE_SIDE) * i as f64 - OFFSET + SQUARE_SIDE / 2.0,
-                                match piece.color {
-                                    PieceColor::Black => {
-                                        Line::from(piece_display_name(&piece.kind).yellow())
-                                    }
-                                    PieceColor::White => {
-                                        Line::from(piece_display_name(&piece.kind).white())
-                                    }
-                                },
-                            ),
-                            None => {}
+                Canvas::default()
+                    .block(block)
+                    .x_bounds([-180.0, 180.0])
+                    .y_bounds([-90.0, 90.0])
+                    .paint(|ctx| {
+                        // draw the grid and pieces
+                        for i in 0..8 {
+                            for j in 0..8 {
+                                ctx.draw(&rectangle_for_square(
+                                    &Coords {
+                                        x: j as isize,
+                                        y: i as isize,
+                                    },
+                                    Color::White,
+                                ));
+                                match &self.game.current_position.board[i][j] {
+                                    Some(piece) => ctx.print(
+                                        (SQUARE_SIDE) * j as f64 - OFFSET + SQUARE_SIDE / 4.0,
+                                        (SQUARE_SIDE) * i as f64 - OFFSET + SQUARE_SIDE / 2.0,
+                                        match piece.color {
+                                            PieceColor::Black => {
+                                                Line::from(piece_display_name(&piece.kind).yellow())
+                                            }
+                                            PieceColor::White => {
+                                                Line::from(piece_display_name(&piece.kind).white())
+                                            }
+                                        },
+                                    ),
+                                    None => {}
+                                }
+                            }
                         }
-                    }
-                }
 
-                // highlight possible destinations
-                ctx.layer();
-                for square in self.highlighted_moves.keys() {
-                    ctx.draw(&rectangle_for_square(square, Color::LightYellow));
-                }
+                        // highlight possible destinations
+                        ctx.layer();
+                        for square in self.highlighted_moves.keys() {
+                            ctx.draw(&rectangle_for_square(square, Color::LightYellow));
+                        }
 
-                // hightlight the selected square
-                if self.selected_square.is_some() {
-                    ctx.layer();
-                    ctx.draw(&rectangle_for_square(
-                        &self.selected_square.expect("Inside nullcheck"),
-                        Color::Blue,
-                    ));
-                }
+                        // hightlight the selected square
+                        if self.selected_square.is_some() {
+                            ctx.layer();
+                            ctx.draw(&rectangle_for_square(
+                                &self.selected_square.expect("Inside nullcheck"),
+                                Color::Blue,
+                            ));
+                        }
 
-                // highlight the cursor
-                ctx.layer();
-                ctx.draw(&rectangle_for_square(&self.cursor, Color::Red));
-            })
-            .render(area, buf);
+                        // highlight the cursor
+                        ctx.layer();
+                        ctx.draw(&rectangle_for_square(&self.cursor, Color::Red));
+                    })
+                    .render(area, buf);
+            }
+        }
     }
 }
