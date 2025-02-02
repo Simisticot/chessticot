@@ -1,4 +1,7 @@
-use chessticot::{ChessMove, Coords, Game, PieceColor, PieceKind, Player, RandomCapturePrioPlayer};
+use chessticot::{
+    ChessMove, Coords, FirstMovePlayer, Game, PieceColor, PieceKind, Player,
+    RandomCapturePrioPlayer, RandomPlayer,
+};
 use core::panic;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -6,7 +9,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Stylize},
     symbols::border,
-    text::Line,
+    text::{Line, Text},
     widgets::{
         canvas::{Canvas, Rectangle},
         Block, Paragraph, Widget, Wrap,
@@ -28,6 +31,32 @@ enum Screen {
     Result,
 }
 
+#[derive(Clone)]
+enum AvailableEngine {
+    First,
+    Random,
+    PrioritizeCapture,
+}
+
+impl AvailableEngine {
+    fn in_order() -> Cycle<std::array::IntoIter<AvailableEngine, 3>> {
+        [
+            AvailableEngine::First,
+            AvailableEngine::Random,
+            AvailableEngine::PrioritizeCapture,
+        ]
+        .into_iter()
+        .cycle()
+    }
+    fn get_engine(&self) -> Box<dyn Player> {
+        match self {
+            AvailableEngine::First => Box::new(FirstMovePlayer {}),
+            AvailableEngine::Random => Box::new(RandomPlayer {}),
+            AvailableEngine::PrioritizeCapture => Box::new(RandomCapturePrioPlayer {}),
+        }
+    }
+}
+
 pub struct App {
     exit: bool,
     game: Game,
@@ -40,6 +69,7 @@ pub struct App {
     selected_color: PieceColor,
     current_screen: Screen,
     selected_engine: Box<dyn Player>,
+    available_engines: Cycle<std::array::IntoIter<AvailableEngine, 3>>,
 }
 
 impl App {
@@ -56,6 +86,7 @@ impl App {
             selected_color: PieceColor::White,
             current_screen: Screen::MainMenu,
             selected_engine: Box::new(RandomCapturePrioPlayer {}),
+            available_engines: AvailableEngine::in_order(),
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -121,6 +152,9 @@ impl App {
                     }
                     KeyCode::Enter => self.current_screen = Screen::Game,
                     KeyCode::Char('q') => self.exit(),
+                    KeyCode::Char('e') => {
+                        self.selected_engine = self.available_engines.next().unwrap().get_engine()
+                    }
                     _ => (),
                 }
             }
@@ -253,14 +287,25 @@ impl Widget for &App {
         match self.current_screen {
             Screen::MainMenu => {
                 let color_selection_title = Line::from(" Choose color ".bold());
-                let color_selection_text = Line::from(format!("Play as {}", self.selected_color));
-                let color_selection_block = Block::bordered()
-                    .title(color_selection_title.centered())
-                    .border_set(border::THICK);
-                Paragraph::new(color_selection_text.white().centered())
-                    .wrap(Wrap { trim: true })
-                    .block(color_selection_block)
-                    .render(area, buf);
+                let color_selection_text = Line::from(format!(
+                    "Play as {} (pick with arrow keys)",
+                    self.selected_color
+                ));
+                let engine_selection_text = Line::from(format!(
+                    "Play against {} (change with 'e')",
+                    self.selected_engine
+                ));
+                Paragraph::new(Text::from(vec![
+                    color_selection_text.white().centered(),
+                    engine_selection_text.white().centered(),
+                ]))
+                .wrap(Wrap { trim: true })
+                .block(
+                    Block::bordered()
+                        .title(color_selection_title.clone().centered())
+                        .border_set(border::THICK),
+                )
+                .render(area, buf);
             }
             Screen::Result => {
                 let result_title = Line::from(" Game Over ".bold());
