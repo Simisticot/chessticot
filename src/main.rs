@@ -120,7 +120,7 @@ impl App {
         Ok(())
     }
     fn handle_events_game(&mut self) -> io::Result<()> {
-        if self.game.checkmated.is_some() {
+        if self.game.checkmated.is_some() || self.game.stalemate {
             self.current_screen = Screen::Result;
             return Ok(());
         }
@@ -309,20 +309,22 @@ impl Widget for &App {
             }
             Screen::Result => {
                 let result_title = Line::from(" Game Over ".bold());
-                let result_text = Line::from(format!(
-                    " {} wins by checkmate !",
-                    self.game
-                        .checkmated
-                        .expect("should only render this if a player is checkmated")
-                        .opposite()
-                ));
                 let result_card = Block::bordered()
                     .title(result_title.centered())
                     .border_set(border::THICK);
-                Paragraph::new(result_text.white().centered())
-                    .wrap(Wrap { trim: true })
-                    .block(result_card)
-                    .render(area, buf);
+                if let Some(color) = self.game.checkmated {
+                    let result_text = Line::from(format!(" {} wins by checkmate !", color));
+                    Paragraph::new(result_text.white().centered())
+                        .wrap(Wrap { trim: true })
+                        .block(result_card)
+                        .render(area, buf);
+                } else {
+                    let result_text = Line::from("Stalemate !");
+                    Paragraph::new(result_text.white().centered())
+                        .wrap(Wrap { trim: true })
+                        .block(result_card)
+                        .render(area, buf);
+                }
             }
             Screen::Game => {
                 let title = Line::from(" Chess Time ".bold());

@@ -17,6 +17,7 @@ pub use crate::position::Position;
 pub struct Game {
     pub current_position: Position,
     pub checkmated: Option<PieceColor>,
+    pub stalemate: bool,
 }
 
 impl Game {
@@ -32,6 +33,7 @@ impl Game {
         Game {
             current_position: Position::initial(),
             checkmated: None,
+            stalemate: false,
         }
     }
 
@@ -39,6 +41,7 @@ impl Game {
         Game {
             current_position: Position::empty_board(),
             checkmated: None,
+            stalemate: false,
         }
     }
     pub fn make_move(&mut self, chess_move: &ChessMove) {

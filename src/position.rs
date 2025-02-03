@@ -568,6 +568,10 @@ impl Position {
             })
             .count()
     }
+
+    pub fn is_stalemate(&self) -> bool {
+        self.all_legal_moves().len() == 0 && !self.is_in_check(&self.to_move)
+    }
 }
 
 #[cfg(test)]
@@ -864,5 +868,24 @@ mod tests {
         assert!(moved_rooks_back.white_left_rook_moved);
         assert!(!moved_rooks_back.is_move_legal(&ChessMove::CastleRight));
         assert!(!moved_rooks_back.is_move_legal(&ChessMove::CastleLeft));
+    }
+
+    #[test]
+    fn detects_stalemate() {
+        let mut position = Position::empty_board();
+        position.board[0][0] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        position.board[2][1] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::Black,
+        });
+        position.board[1][2] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::Black,
+        });
+
+        assert!(position.is_stalemate());
     }
 }
