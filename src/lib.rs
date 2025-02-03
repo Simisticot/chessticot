@@ -6,6 +6,8 @@ mod piece;
 mod player;
 mod position;
 
+use core::panic;
+
 pub use crate::board_manip::{move_piece, piece_at, put_piece_at, take_piece_at};
 pub use crate::chess_move::{ChessMove, Move};
 pub use crate::coords::{all_squares, cards, eight_degrees, inter_cards, Coords, Direction};
@@ -53,6 +55,45 @@ impl Game {
                 self.checkmated = Some(self.current_position.to_move.clone());
             }
         }
+    }
+}
+
+#[derive(Debug)]
+pub enum GameResult {
+    WhiteWin,
+    BlackWin,
+    Stalemate,
+    TimedOut,
+}
+
+pub fn play_engine_game(
+    white_player: Box<dyn Player>,
+    black_player: Box<dyn Player>,
+) -> GameResult {
+    let mut game = Game::start();
+    let mut turn_counter = 0;
+
+    while game.checkmated.is_none() && !game.current_position.is_stalemate() && turn_counter < 300 {
+        let offered_move = match game.current_position.to_move {
+            PieceColor::White => white_player.offer_move(&game.current_position),
+            PieceColor::Black => black_player.offer_move(&game.current_position),
+        };
+        if !game.current_position.is_move_legal(&offered_move) {
+            panic!("engine offered illegal move");
+        } else {
+            game.make_move(&offered_move);
+            turn_counter += 1;
+        }
+    }
+    if let Some(color) = game.checkmated {
+        match color {
+            PieceColor::White => GameResult::BlackWin,
+            PieceColor::Black => GameResult::WhiteWin,
+        }
+    } else if game.current_position.is_stalemate() {
+        GameResult::Stalemate
+    } else {
+        GameResult::TimedOut
     }
 }
 
