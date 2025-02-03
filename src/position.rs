@@ -139,10 +139,59 @@ impl Position {
                 );
             }
         }
+
+        let white_left_rook_moved = match chess_move {
+            ChessMove::RegularMove(movement) => {
+                movement.origin == Coords { y: 0, x: 0 } || self.white_left_rook_moved
+            }
+            _ => self.white_left_rook_moved,
+        };
+        let white_right_rook_moved = match chess_move {
+            ChessMove::RegularMove(movement) => {
+                movement.origin == Coords { y: 0, x: 7 } || self.white_right_rook_moved
+            }
+            _ => self.white_right_rook_moved,
+        };
+        let black_left_rook_moved = match chess_move {
+            ChessMove::RegularMove(movement) => {
+                movement.origin == Coords { y: 7, x: 0 } || self.black_left_rook_moved
+            }
+            _ => self.black_left_rook_moved,
+        };
+        let black_right_rook_moved = match chess_move {
+            ChessMove::RegularMove(movement) => {
+                movement.origin == Coords { y: 7, x: 7 } || self.black_right_rook_moved
+            }
+            _ => self.black_right_rook_moved,
+        };
+
+        let black_king_moved = match chess_move {
+            ChessMove::CastleLeft | ChessMove::CastleRight => self.to_move == PieceColor::Black,
+            ChessMove::RegularMove(movement) => piece_at(&self.board, &movement.origin)
+                .is_some_and(|piece| {
+                    piece.kind == PieceKind::King && piece.color == PieceColor::Black
+                }),
+            _ => self.white_king_moved,
+        };
+        let white_king_moved = match chess_move {
+            ChessMove::CastleLeft | ChessMove::CastleRight => self.to_move == PieceColor::White,
+            ChessMove::RegularMove(movement) => piece_at(&self.board, &movement.origin)
+                .is_some_and(|piece| {
+                    piece.kind == PieceKind::King && piece.color == PieceColor::White
+                }),
+            _ => self.white_king_moved,
+        };
+
         Position {
             board: new_board,
             to_move: self.to_move.opposite(),
             en_passant_on,
+            black_king_moved,
+            white_king_moved,
+            black_right_rook_moved,
+            black_left_rook_moved,
+            white_right_rook_moved,
+            white_left_rook_moved,
             ..self.clone()
         }
     }
@@ -719,5 +768,101 @@ mod tests {
             position.king_location(&PieceColor::White).unwrap(),
             Coords { x: 0, y: 0 }
         )
+    }
+
+    #[test]
+    fn cant_castle_after_moving_king() {
+        let mut position = Position::empty_board();
+        position.board[0][4] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        position.board[0][7] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        position.board[0][0] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        let king_initial_location = Coords { y: 0, x: 4 };
+        let one_above = Coords { y: 1, x: 4 };
+
+        let after_move_up = position.after_move(&ChessMove::RegularMove(Move {
+            origin: king_initial_location,
+            destination: one_above,
+        }));
+
+        assert!(after_move_up.white_king_moved);
+        assert!(!after_move_up.is_move_legal(&ChessMove::CastleLeft));
+        assert!(!after_move_up.is_move_legal(&ChessMove::CastleRight));
+
+        let after_move_back = after_move_up.after_move(&ChessMove::RegularMove(Move {
+            origin: one_above,
+            destination: king_initial_location,
+        }));
+
+        assert!(after_move_back.white_king_moved);
+        assert!(!after_move_back.is_move_legal(&ChessMove::CastleLeft));
+        assert!(!after_move_back.is_move_legal(&ChessMove::CastleRight));
+    }
+
+    #[test]
+    fn cannot_castle_after_moving_rook() {
+        let mut position = Position::empty_board();
+        position.board[0][4] = Some(Piece {
+            kind: PieceKind::King,
+            color: PieceColor::White,
+        });
+        position.board[0][7] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        position.board[0][0] = Some(Piece {
+            kind: PieceKind::Rook,
+            color: PieceColor::White,
+        });
+        let left_rook_initial_location = Coords { y: 0, x: 0 };
+        let left_rook_up_one = Coords { y: 1, x: 0 };
+        let right_rook_initial_location = Coords { y: 0, x: 7 };
+        let right_rook_up_one = Coords { y: 1, x: 7 };
+
+        let moved_left_rook_up_one = position
+            .after_move(&ChessMove::RegularMove(Move {
+                origin: left_rook_initial_location,
+                destination: left_rook_up_one,
+            }))
+            .color_to_move(PieceColor::White);
+
+        assert!(moved_left_rook_up_one.white_left_rook_moved);
+        assert!(!moved_left_rook_up_one.white_right_rook_moved);
+
+        assert!(!moved_left_rook_up_one.is_move_legal(&ChessMove::CastleLeft));
+        assert!(moved_left_rook_up_one.is_move_legal(&ChessMove::CastleRight));
+
+        let moved_right_rook_up_one = moved_left_rook_up_one
+            .after_move(&ChessMove::RegularMove(Move {
+                origin: right_rook_initial_location,
+                destination: right_rook_up_one,
+            }))
+            .color_to_move(PieceColor::White);
+
+        assert!(moved_right_rook_up_one.white_right_rook_moved);
+        assert!(!moved_right_rook_up_one.is_move_legal(&ChessMove::CastleRight));
+
+        let moved_rooks_back = moved_right_rook_up_one
+            .after_move(&ChessMove::RegularMove(Move {
+                origin: left_rook_up_one,
+                destination: left_rook_initial_location,
+            }))
+            .after_move(&ChessMove::RegularMove(Move {
+                origin: right_rook_up_one,
+                destination: right_rook_initial_location,
+            }));
+
+        assert!(moved_rooks_back.white_right_rook_moved);
+        assert!(moved_rooks_back.white_left_rook_moved);
+        assert!(!moved_rooks_back.is_move_legal(&ChessMove::CastleRight));
+        assert!(!moved_rooks_back.is_move_legal(&ChessMove::CastleLeft));
     }
 }
