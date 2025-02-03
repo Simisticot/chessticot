@@ -250,7 +250,7 @@ impl Position {
 
         self.legal_moves_from_origin(&origin).contains(chess_move)
     }
-    fn is_attacked_by(&self, by: &PieceColor, square: &Coords) -> bool {
+    pub fn is_attacked_by(&self, by: &PieceColor, square: &Coords) -> bool {
         self.color_to_move(by.clone())
             .all_possible_moves()
             .iter()

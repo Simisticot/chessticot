@@ -1,5 +1,5 @@
 use chessticot::{
-    ChessMove, Coords, FirstMovePlayer, Game, PieceColor, PieceKind, Player,
+    BasicEvaluationPlayer, ChessMove, Coords, FirstMovePlayer, Game, PieceColor, PieceKind, Player,
     RandomCapturePrioPlayer, RandomPlayer,
 };
 use core::panic;
@@ -36,14 +36,16 @@ enum AvailableEngine {
     First,
     Random,
     PrioritizeCapture,
+    BasicEval,
 }
 
 impl AvailableEngine {
-    fn in_order() -> Cycle<std::array::IntoIter<AvailableEngine, 3>> {
+    fn in_order() -> Cycle<std::array::IntoIter<AvailableEngine, 4>> {
         [
             AvailableEngine::First,
             AvailableEngine::Random,
             AvailableEngine::PrioritizeCapture,
+            AvailableEngine::BasicEval,
         ]
         .into_iter()
         .cycle()
@@ -53,6 +55,7 @@ impl AvailableEngine {
             AvailableEngine::First => Box::new(FirstMovePlayer {}),
             AvailableEngine::Random => Box::new(RandomPlayer {}),
             AvailableEngine::PrioritizeCapture => Box::new(RandomCapturePrioPlayer {}),
+            AvailableEngine::BasicEval => Box::new(BasicEvaluationPlayer {}),
         }
     }
 }
@@ -69,7 +72,7 @@ pub struct App {
     selected_color: PieceColor,
     current_screen: Screen,
     selected_engine: Box<dyn Player>,
-    available_engines: Cycle<std::array::IntoIter<AvailableEngine, 3>>,
+    available_engines: Cycle<std::array::IntoIter<AvailableEngine, 4>>,
 }
 
 impl App {
@@ -313,7 +316,8 @@ impl Widget for &App {
                     .title(result_title.centered())
                     .border_set(border::THICK);
                 if let Some(color) = self.game.checkmated {
-                    let result_text = Line::from(format!(" {} wins by checkmate !", color));
+                    let result_text =
+                        Line::from(format!(" {} wins by checkmate !", color.opposite()));
                     Paragraph::new(result_text.white().centered())
                         .wrap(Wrap { trim: true })
                         .block(result_card)
