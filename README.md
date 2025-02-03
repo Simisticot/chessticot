@@ -5,7 +5,7 @@ I am using the chess logic to build (for now rudimentary) chess engines "from fi
 ## Current Advancement
 - All chess rules are implemented, with very partial test coverage and likely bugs  
 - Proof of concept engines are available, that play random moves and crash the program when no move is legal  
-- The UI allows you to pick a color and the other color will be played by the latest generation engine (dumb)  
+- The UI allows you to pick a color and what engine to play against  
 
 ## Controls
 - In main menu use left and right arrow keys to select your color, enter to confirm  
