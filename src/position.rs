@@ -1,3 +1,5 @@
+use std::str;
+
 use crate::all_squares;
 use crate::cards;
 use crate::eight_degrees;
@@ -14,7 +16,7 @@ use crate::Piece;
 use crate::PieceColor;
 use crate::PieceKind;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Position {
     pub board: Vec<Vec<Option<Piece>>>,
     pub to_move: PieceColor,
@@ -68,6 +70,113 @@ impl Position {
             black_left_rook_moved: false,
             black_right_rook_moved: false,
             en_passant_on: None,
+        }
+    }
+    pub fn from_fen(fen_record: &str) -> Position {
+        let fields: Vec<&str> = fen_record.split(" ").collect();
+
+        assert!(fields.len() == 6);
+
+        let mut board = vec![vec![]; 8];
+        let mut rank = 7;
+        fields[0].chars().for_each(|character| match character {
+            '1'..='8' => {
+                for _ in 0..character.to_digit(10).expect("matched digits 1 through 8") {
+                    board[rank].push(None);
+                }
+            }
+            '/' => {
+                rank -= 1;
+            }
+            'r' => board[rank].push(Some(Piece {
+                kind: PieceKind::Rook,
+                color: PieceColor::Black,
+            })),
+            'n' => board[rank].push(Some(Piece {
+                kind: PieceKind::Knight,
+                color: PieceColor::Black,
+            })),
+            'b' => board[rank].push(Some(Piece {
+                kind: PieceKind::Bishop,
+                color: PieceColor::Black,
+            })),
+            'q' => board[rank].push(Some(Piece {
+                kind: PieceKind::Queen,
+                color: PieceColor::Black,
+            })),
+            'k' => board[rank].push(Some(Piece {
+                kind: PieceKind::King,
+                color: PieceColor::Black,
+            })),
+            'p' => board[rank].push(Some(Piece {
+                kind: PieceKind::Pawn,
+                color: PieceColor::Black,
+            })),
+            'R' => board[rank].push(Some(Piece {
+                kind: PieceKind::Rook,
+                color: PieceColor::White,
+            })),
+            'N' => board[rank].push(Some(Piece {
+                kind: PieceKind::Knight,
+                color: PieceColor::White,
+            })),
+            'B' => board[rank].push(Some(Piece {
+                kind: PieceKind::Bishop,
+                color: PieceColor::White,
+            })),
+            'Q' => board[rank].push(Some(Piece {
+                kind: PieceKind::Queen,
+                color: PieceColor::White,
+            })),
+            'K' => board[rank].push(Some(Piece {
+                kind: PieceKind::King,
+                color: PieceColor::White,
+            })),
+            'P' => board[rank].push(Some(Piece {
+                kind: PieceKind::Pawn,
+                color: PieceColor::White,
+            })),
+            _ => panic!("{} is not a valid board character in FEN", character),
+        });
+
+        assert_eq!(board.len(), 8);
+        for rank in &board {
+            assert_eq!(rank.len(), 8);
+        }
+
+        assert!(fields[1].len() == 1);
+
+        let to_move = match fields[1]
+            .chars()
+            .nth(0)
+            .expect("Second FEN field should be 'w' or 'b'")
+        {
+            'w' => PieceColor::White,
+            'b' => PieceColor::Black,
+            _ => panic!("Second FEN field should be 'w' or 'b'"),
+        };
+
+        let white_can_castle_left = fields[2].contains("Q");
+        let white_can_castle_right = fields[2].contains("K");
+        let black_can_castle_left = fields[2].contains("q");
+        let black_can_castle_right = fields[2].contains("k");
+
+        let en_passant_on = if fields[3] == "-" {
+            None
+        } else {
+            Some(Coords::from_algebraic(fields[3]))
+        };
+
+        Position {
+            board,
+            to_move,
+            en_passant_on,
+            white_king_moved: false,
+            black_king_moved: false,
+            white_left_rook_moved: !white_can_castle_left,
+            white_right_rook_moved: !white_can_castle_right,
+            black_left_rook_moved: !black_can_castle_left,
+            black_right_rook_moved: !black_can_castle_right,
         }
     }
     pub fn opposite_color_to_move(&self) -> Position {
@@ -576,7 +685,16 @@ impl Position {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+
+    #[test]
+    fn initial_position_from_fen() {
+        assert_eq!(
+            Position::initial(),
+            Position::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        );
+    }
 
     #[test]
     fn execute_move_into_check() {

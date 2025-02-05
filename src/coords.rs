@@ -10,6 +10,42 @@ impl Coords {
     pub fn is_in_bounds(&self) -> bool {
         self.x < 8 && self.x >= 0 && self.y < 8 && self.y >= 0
     }
+
+    pub fn from_algebraic(square: &str) -> Coords {
+        assert!(square.len() == 2);
+
+        let x = match square
+            .chars()
+            .nth(0)
+            .expect("algebraic coordinates should be 2 characters long (asserted above)")
+        {
+            'a' => 0,
+            'b' => 1,
+            'c' => 2,
+            'd' => 3,
+            'e' => 4,
+            'f' => 5,
+            'g' => 6,
+            'h' => 7,
+            _ => panic!("algebraic file should be a through h"),
+        };
+
+        let y = square
+            .chars()
+            .nth(1)
+            .expect("algebraic coordinates should be 2 characters long (asserted above)")
+            .to_digit(10)
+            .expect("algebraic rank should be a digit from 1 to 8")
+            - 1;
+
+        assert!(y >= 0);
+        assert!(y <= 7);
+
+        Coords {
+            x: x as isize,
+            y: y as isize,
+        }
+    }
 }
 pub fn all_squares() -> Vec<Coords> {
     let mut squares = Vec::new();
@@ -68,4 +104,14 @@ pub fn cards() -> Vec<Direction> {
     let left = Direction { dx: -1, dy: 0 };
     let right = Direction { dx: 1, dy: 0 };
     vec![up, down, left, right]
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Coords;
+
+    #[test]
+    fn coord_from_algebraic() {
+        assert_eq!(Coords { x: 4, y: 3 }, Coords::from_algebraic("e4"));
+    }
 }

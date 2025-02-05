@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Piece {
     pub kind: PieceKind,
     pub color: PieceColor,
