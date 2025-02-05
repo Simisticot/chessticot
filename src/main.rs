@@ -1,6 +1,6 @@
 use chessticot::{
-    BasicEvaluationPlayer, ChessMove, Coords, FirstMovePlayer, Game, PieceColor, PieceKind, Player,
-    RandomCapturePrioPlayer, RandomPlayer,
+    BasicEvaluationPlayer, BetterEvaluationPlayer, ChessMove, Coords, FirstMovePlayer, Game,
+    PieceColor, PieceKind, Player, RandomCapturePrioPlayer, RandomPlayer,
 };
 use core::panic;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
@@ -37,15 +37,17 @@ enum AvailableEngine {
     Random,
     PrioritizeCapture,
     BasicEval,
+    BetterEval,
 }
 
 impl AvailableEngine {
-    fn in_order() -> Cycle<std::array::IntoIter<AvailableEngine, 4>> {
+    fn in_order() -> Cycle<std::array::IntoIter<AvailableEngine, 5>> {
         [
             AvailableEngine::First,
             AvailableEngine::Random,
             AvailableEngine::PrioritizeCapture,
             AvailableEngine::BasicEval,
+            AvailableEngine::BetterEval,
         ]
         .into_iter()
         .cycle()
@@ -56,6 +58,7 @@ impl AvailableEngine {
             AvailableEngine::Random => Box::new(RandomPlayer {}),
             AvailableEngine::PrioritizeCapture => Box::new(RandomCapturePrioPlayer {}),
             AvailableEngine::BasicEval => Box::new(BasicEvaluationPlayer {}),
+            AvailableEngine::BetterEval => Box::new(BetterEvaluationPlayer {}),
         }
     }
 }
@@ -72,7 +75,8 @@ pub struct App {
     selected_color: PieceColor,
     current_screen: Screen,
     selected_engine: Box<dyn Player>,
-    available_engines: Cycle<std::array::IntoIter<AvailableEngine, 4>>,
+    available_engines: Cycle<std::array::IntoIter<AvailableEngine, 5>>,
+    evalutation: isize,
 }
 
 impl App {
@@ -90,6 +94,7 @@ impl App {
             current_screen: Screen::MainMenu,
             selected_engine: Box::new(RandomCapturePrioPlayer {}),
             available_engines: AvailableEngine::in_order(),
+            evalutation: 0,
         }
     }
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
@@ -240,6 +245,12 @@ impl App {
                 ));
             } else {
                 self.game.make_move(&move_to_make);
+                self.evalutation = self.selected_engine.evalutate(
+                    &self
+                        .game
+                        .current_position
+                        .color_to_move(self.selected_color.opposite()),
+                );
             }
         }
 
@@ -336,8 +347,11 @@ impl Widget for &App {
                     Line::from(format!("promoting to {:?}", self.promoting_to))
                         .centered()
                         .green();
+                let engine_evaluation_label =
+                    Line::from(format!("Evaluation: {}", self.evalutation));
                 let block = Block::bordered()
                     .title(title.centered())
+                    .title_bottom(engine_evaluation_label.left_aligned())
                     .title_bottom(promoting_to_label)
                     .border_set(border::THICK);
 

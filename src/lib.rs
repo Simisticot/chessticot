@@ -12,7 +12,8 @@ pub use crate::board_manip::{move_piece, piece_at, put_piece_at, take_piece_at};
 pub use crate::chess_move::{ChessMove, Move};
 pub use crate::coords::{all_squares, cards, eight_degrees, inter_cards, Coords, Direction};
 pub use crate::engine::{
-    BasicEvaluationPlayer, FirstMovePlayer, RandomCapturePrioPlayer, RandomPlayer,
+    BasicEvaluationPlayer, BetterEvaluationPlayer, FirstMovePlayer, RandomCapturePrioPlayer,
+    RandomPlayer,
 };
 pub use crate::piece::{Piece, PieceColor, PieceKind};
 pub use crate::player::Player;
@@ -54,6 +55,7 @@ impl Game {
             if self.current_position.is_checkmate() {
                 self.checkmated = Some(self.current_position.to_move.clone());
             }
+            self.stalemate = self.current_position.is_stalemate()
         }
     }
 }
