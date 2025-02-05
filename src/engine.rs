@@ -214,16 +214,16 @@ fn better_evaluation(position: &Position) -> isize {
         let control_value = 2;
         let attacked_factor = if is_attacked {
             if &piece.color == to_move {
-                1
+                -5
             } else {
-                0
+                -piece_value(&piece.kind)
             }
         } else {
-            2
+            0
         };
-        (value + (controlled_squares * control_value)) * attacked_factor
+        (value + (controlled_squares * control_value)) + attacked_factor
     }
-    all_squares()
+    let score_from_all_squares = all_squares()
         .iter()
         .map(|square| match piece_at(&position.board, square) {
             None => 0 as isize,
@@ -240,5 +240,7 @@ fn better_evaluation(position: &Position) -> isize {
             ),
         })
         .reduce(|acc, e| acc + e)
-        .expect("all squares is never 0 length")
+        .expect("all squares is never 0 length");
+    let score_from_checkmate = if position.is_checkmate() { 10000000 } else { 0 };
+    score_from_all_squares + score_from_checkmate
 }
