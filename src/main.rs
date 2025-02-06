@@ -107,7 +107,7 @@ impl App {
             selectable_colors: PieceColor::both().cycle(),
             selected_color: PieceColor::White,
             current_screen: Screen::MainMenu,
-            selected_engine: Box::new(RandomCapturePrioPlayer {}),
+            selected_engine: Box::new(BetterEvaluationPlayer {}),
             available_engines: AvailableEngine::in_order(),
             evalutation: 0,
         }
