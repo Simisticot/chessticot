@@ -229,7 +229,7 @@ fn better_evaluation(position: &Position) -> isize {
             None => 0 as isize,
             Some(piece) => evaluate_piece(
                 &piece,
-                position.is_attacked_by(&position.to_move.opposite(), square),
+                position.is_attacked_by(&piece.color.opposite(), square),
                 &position.to_move,
                 position
                     .color_to_move(piece.color)
