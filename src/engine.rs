@@ -196,12 +196,12 @@ impl Display for BetterEvaluationPlayer {
 fn better_evaluation(position: &Position) -> isize {
     fn piece_value(kind: &PieceKind) -> isize {
         match kind {
-            PieceKind::King => 1000,
-            PieceKind::Pawn => 10,
-            PieceKind::Rook => 50,
-            PieceKind::Bishop => 30,
-            PieceKind::Knight => 20,
-            PieceKind::Queen => 500,
+            PieceKind::King => 10000,
+            PieceKind::Pawn => 100,
+            PieceKind::Rook => 500,
+            PieceKind::Bishop => 300,
+            PieceKind::Knight => 200,
+            PieceKind::Queen => 5000,
         }
     }
     fn evaluate_piece(
@@ -212,6 +212,7 @@ fn better_evaluation(position: &Position) -> isize {
     ) -> isize {
         let value = piece_value(&piece.kind);
         let control_value = 2;
+        let own_color_factor = if &piece.color == to_move { -1 } else { 1 };
         let attacked_factor = if is_attacked {
             if &piece.color == to_move {
                 -5
@@ -221,7 +222,7 @@ fn better_evaluation(position: &Position) -> isize {
         } else {
             0
         };
-        (value + (controlled_squares * control_value)) + attacked_factor
+        ((value + (controlled_squares * control_value)) + attacked_factor) * own_color_factor
     }
     let score_from_all_squares = all_squares()
         .iter()
