@@ -157,7 +157,7 @@ impl App {
         } else {
             let offered_move = self.selected_engine.offer_move(&self.game.current_position);
             if self.game.current_position.is_move_legal(&offered_move) {
-                self.game.current_position = self.game.current_position.after_move(&offered_move);
+                self.game.make_move(&offered_move);
             } else {
                 panic!("engine offered illegal move");
             }
