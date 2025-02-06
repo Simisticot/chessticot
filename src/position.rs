@@ -697,6 +697,14 @@ mod tests {
     }
 
     #[test]
+    fn finds_complex_checkmate() {
+        assert!(Position::from_fen(
+            "r1bqkbnr/2pp1Qpp/ppn5/4p3/2BPP3/8/PPP2PPP/RNB1K1NR b KQkq - 0 1"
+        )
+        .is_checkmate());
+    }
+
+    #[test]
     fn execute_move_into_check() {
         let mut position = Position::empty_board();
 
