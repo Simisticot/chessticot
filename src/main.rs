@@ -105,7 +105,7 @@ impl App {
             promoting_to: PieceKind::Queen,
             promotion_target: PieceKind::promoteable().cycle(),
             selectable_colors: PieceColor::both().cycle(),
-            selected_color: PieceColor::White,
+            selected_color: PieceColor::Black,
             current_screen: Screen::MainMenu,
             selected_engine: Box::new(BetterEvaluationPlayer {}),
             available_engines: AvailableEngine::in_order(),
