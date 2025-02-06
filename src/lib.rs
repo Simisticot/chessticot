@@ -58,6 +58,16 @@ impl Game {
             self.stalemate = self.current_position.is_stalemate()
         }
     }
+
+    pub fn from_starting_position(starting_position: Position) -> Game {
+        let checkmated = starting_position.checkmated();
+        let stalemate = starting_position.is_stalemate();
+        Game {
+            current_position: starting_position,
+            checkmated,
+            stalemate,
+        }
+    }
 }
 
 #[derive(Debug)]

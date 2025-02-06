@@ -307,6 +307,13 @@ impl Position {
     pub fn is_checkmate(&self) -> bool {
         return self.is_in_check(&self.to_move) && self.all_legal_moves().len() == 0;
     }
+    pub fn checkmated(&self) -> Option<PieceColor> {
+        if self.is_checkmate() {
+            Some(self.to_move)
+        } else {
+            None
+        }
+    }
     pub fn all_legal_moves(&self) -> Vec<ChessMove> {
         all_squares()
             .iter()

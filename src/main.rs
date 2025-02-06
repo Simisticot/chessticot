@@ -1,6 +1,6 @@
 use chessticot::{
     BasicEvaluationPlayer, BetterEvaluationPlayer, ChessMove, Coords, FirstMovePlayer, Game,
-    PieceColor, PieceKind, Player, RandomCapturePrioPlayer, RandomPlayer,
+    PieceColor, PieceKind, Player, Position, RandomCapturePrioPlayer, RandomPlayer,
 };
 use core::panic;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
@@ -16,11 +16,22 @@ use ratatui::{
     },
     DefaultTerminal, Frame,
 };
-use std::{collections::HashMap, io, iter::Cycle};
+use std::{
+    collections::HashMap,
+    env::{self},
+    io,
+    iter::Cycle,
+};
 
 fn main() -> io::Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let starting_position = if args.len() > 1 {
+        Some(Position::from_fen(&args[1]))
+    } else {
+        None
+    };
     let mut terminal = ratatui::init();
-    let app_result = App::init().run(&mut terminal);
+    let app_result = App::init(starting_position).run(&mut terminal);
     ratatui::restore();
     app_result
 }
@@ -80,10 +91,14 @@ pub struct App {
 }
 
 impl App {
-    pub fn init() -> App {
+    pub fn init(starting_position: Option<Position>) -> App {
+        let mut game = Game::start();
+        if let Some(position) = starting_position {
+            game = Game::from_starting_position(position);
+        }
         App {
             exit: false,
-            game: Game::start(),
+            game,
             cursor: Coords { x: 0, y: 0 },
             selected_square: None,
             highlighted_moves: HashMap::new(),
