@@ -38,7 +38,6 @@ impl Coords {
             .expect("algebraic rank should be a digit from 1 to 8")
             - 1;
 
-        assert!(y >= 0);
         assert!(y <= 7);
 
         Coords {

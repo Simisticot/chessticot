@@ -23,7 +23,7 @@ impl Player for FirstMovePlayer {
     fn offer_move(&self, position: &Position) -> ChessMove {
         position.all_legal_moves().iter().next().unwrap().clone()
     }
-    fn evalutate(&self, position: &Position) -> isize {
+    fn evalutate(&self, _position: &Position) -> isize {
         0
     }
 }
@@ -40,7 +40,7 @@ impl Player for RandomPlayer {
     fn offer_move(&self, position: &Position) -> ChessMove {
         pick_random_move(position)
     }
-    fn evalutate(&self, position: &Position) -> isize {
+    fn evalutate(&self, _position: &Position) -> isize {
         0
     }
 }
@@ -83,7 +83,7 @@ impl Player for RandomCapturePrioPlayer {
             pick_random_move(position)
         }
     }
-    fn evalutate(&self, position: &Position) -> isize {
+    fn evalutate(&self, _position: &Position) -> isize {
         0
     }
 }
