@@ -1,9 +1,9 @@
-use chessticot::{
+use core::panic;
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use libchessticot::{
     BasicEvaluationPlayer, BetterEvaluationPlayer, ChessMove, Coords, FirstMovePlayer, Game,
     PieceColor, PieceKind, Player, Position, RandomCapturePrioPlayer, RandomPlayer,
 };
-use core::panic;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
